@@ -214,5 +214,5 @@ void Board::InitLeaperAttacks(){
             knight_attacks[square] = CalcKnightAttacks(square);
         }
     }
-    PrintBoard(king_attacks[h1]);
+    //PrintBoard(king_attacks[h1]);
 }
