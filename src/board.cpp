@@ -6,8 +6,8 @@
 #include <string.h>
 #include <assert.h>  
 #include "board.h"
-using namespace std;
 
+using namespace std;
 
 //Macro that returns the bit of the bitboard at the square
 #define get_bit(bitboard, square)(bitboard & (1ULL << square))
@@ -21,7 +21,7 @@ using namespace std;
 // Macro that defines whether direction is negative ray direction, bases it off enum number
 #define is_negative(dir)(dir > 3)
 
-
+const U64 a_file = 0x101010101010101ULL;        // All 1's in a file
 const U64 not_a_file = 0xfefefefefefefefeULL;   // All 1's except a file
 const U64 not_h_file = 0x7f7f7f7f7f7f7f7fULL;   // All 1's except h file
 const U64 not_ab_file = 0xfcfcfcfcfcfcfcfcULL;  // All 1's except ab files
@@ -112,7 +112,7 @@ void Board::PrintBoard(U64 bitboard){
     cout << "Binary: " << bitset<64>(bitboard) << endl;
 
     // Prints out hexadecimal representation of the board
-    printf("Hexadecimal: %lx\n", bitboard);
+    printf("Hexadecimal: 0x%lxULL\n", bitboard);
     
 }
 
@@ -125,11 +125,13 @@ void Board::Test(){
         for (int file = 0; file < 8; file++)
         {
             int square = rank * 8 + file;
-            if(file < 7 && rank ==7){
+            if(rank + file == 7 && rank > 0){
                 set_bit(test_board, square);
             }
         }
     }
+    //PrintBoard(ray_attacks[g3][NoEa]);
+    //PrintBoard(a_file | (a_file << 1) | (a_file << 2));
     PrintBoard(test_board);
 }
 
@@ -255,13 +257,23 @@ U64 Board::CalcRookAttacks(int square){
     // set piece on board
     set_bit(bitboard, square);
 
-    U64 north_ray_attack = ray_attacks[square][Nort];
-    U64 blocker = north_ray_attack & occupancy;
-    unsigned long bit_index;
-    int index = ffs(blocker);
-    north_ray_attack = north_ray_attack ^ ray_attacks[index][Nort];
+    // Creates a vector of the rays to construct the attacks from
+    enumDirections dirs[4] = {Nort, East, West, Sout};
 
-    return north_ray_attack;
+    // Iterates over every direction to construct attack table
+    for (int i = 0; i < 4; i++){
+        
+        // Assigns the current direction to dir
+        enumDirections dir = dirs[i];
+        
+        // Gets the appropriate ray attack for the direction and square
+        U64 ray_attack = GetDirRayAttacks(dir, square);
+
+        // Adds the ray attack to the overall attacks table with a union
+        attacks |= ray_attack;
+    }
+
+    return attacks;
 }
 
 /* Returns the ray attack in a given direction (N, NW, S, SE, etc...) from the given square.
@@ -269,12 +281,24 @@ This function considers blocker pieces. Thus, the ray attacks only go as far as 
 square allows */
 U64 Board::GetDirRayAttacks(enumDirections dir, int square){
 
+    // Retrieves ray attacks from lookup table
     U64 ray_attack = ray_attacks[square][dir];
+
+    // Calculates every piece that ray can hit with intersection of ray attack and occupancy    
     U64 blocker = ray_attack & occupancy;
+
+    // If there is a blocker, make sure ray attack cannot go through that square
     if(blocker){
-        int bit_index = BitScan(blocker, is_negative(dir));
-        cout << bit_index;
+        // Gets the index of the first piece the ray attack would hit
+        int index = BitScan(blocker, is_negative(dir));
+
+        // Does an XOR to calculate the ray attack UP TO the first piece it hits and no further. 
+        // This works by looking up what the ray would be at the first blocker and then simply XORing
+        // to get the original ray minus the ray from the blocker square
+        ray_attack ^= ray_attacks[index][dir];
     }
+
+    return ray_attack;
 }
 
 /* Initialize Ray Attack table. Constructs north, south, east, and west ray attacks (occupancy agnostic)
@@ -326,6 +350,18 @@ void Board::InitRayAttacks(){
             ray_attacks[rank * 8 + file][West] = west & new_west;
         }
     }
+
+    // A line of ones extending northeastwards from a1
+    U64 noea = 0x8040201008040200ULL;
+    
+    for (int rank = 0; rank < 8; rank++){
+        U64 wrap_mask = a_file;
+        for (int file = 0; file < 8; file++, noea <<= 1, wrap_mask|= wrap_mask << 1)
+        {
+            ray_attacks[rank * 8 + file][NoEa] = noea & ~wrap_mask;
+        }
+    }
+
 }
 
 
@@ -348,33 +384,16 @@ void Board::InitSliderAttacks(){
 
 /* Helper function used to find either the least significant bit (rightmost) or the most significant bit
 (leftmost) of a bitboard. bitscan reverse is used to find the MSB */
-int Board::BitScan(U64 bitboard, bool reverse){
+int Board::BitScan(U64 bitboard, bool reverse=false){
 
-    // If reverse is not true, do a forward bitscan with ffs() function
+
+    // If reverse is not true, do a forward bitscan with ffs() function. Subtract 1 to get 0 based index.
     if(!reverse){
-        return ffs(bitboard);
+        return __builtin_ffsll(bitboard) - 1;
     }
-    // Otherwise, do a reverse bitscan with the bitscanReverse() function
+    // Uses builtin function that returns trailing zeros from most significant bit. Need to subtract
+    // from 63 to get correct 0 based index.
     else{
-        return bitScanReverse(bitboard);
+        return 63 - __builtin_clzll(bitboard);
     }
-}
-
-/**
- * bitScanReverse
- * @authors Kim Walisch, Mark Dickinson
- * @param bb bitboard to scan
- * @precondition bb != 0
- * @return index (0..63) of most significant one bit
- */
-int Board::bitScanReverse(U64 bb) {
-    const U64 debruijn64 = 0x03f79d71b4cb0a89ULL;
-    assert(bb != 0);
-    bb |= bb >> 1;
-    bb |= bb >> 2;
-    bb |= bb >> 4;
-    bb |= bb >> 8;
-    bb |= bb >> 16;
-    bb |= bb >> 32;
-    return index64[(bb * debruijn64) >> 58];
 }

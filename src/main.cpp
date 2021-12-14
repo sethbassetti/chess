@@ -6,5 +6,5 @@ using namespace std;
 int main(){
 
     Board x;
-    //x.Test();
+    x.Test();
 }
