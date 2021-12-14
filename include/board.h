@@ -22,12 +22,27 @@ enum enumSquare{
     a8, b8, c8, d8, e8, f8, g8, h8,
 };
 
+// Enumerates directions 
+enum enumDirections
+{
+    Nort,
+    NoEa,
+    East,
+    NoWe,
+    SoEa,
+    Sout,
+    SoWe,
+    West,
+};
+
 class Board
 {
 
 public:
+    // Constructor function for board. Takes care of setting everything up.
     Board();
 
+    // Helper function that prints a bitboard in a pretty format
     void PrintBoard(U64 bitboard);
     void Test();
 
@@ -35,6 +50,7 @@ private:
     /* Combined pieces */
     U64 white_pieces;
     U64 black_pieces;
+    U64 occupancy;
 
     /* white pieces */
     U64 white_pawns;
@@ -52,18 +68,39 @@ private:
     U64 black_queens;
     U64 black_kings;
 
-    // Stores pawn attacks for each pawn of each color
-    U64 pawn_attacks[2][64];
-
-    // Stores king attacks for each possible king square
+    // Stores precalculated attack tables for various pieces
+    U64 pawn_attacks[2][64];    // Moves of pawns depend on their color so we need two sides.
     U64 king_attacks[64];
-
-    // Stores knight attacks for each possible knight square
     U64 knight_attacks[64];
+    U64 rook_attacks[64];
 
+    // Stores precalculated ray attack tables for each of the 8 directions
+    U64 ray_attacks[64][8];
+
+    // Functions that calculate attack tables for the pieces
     U64 CalcPawnAttacks(int side, int square);
     U64 CalcKingAttacks(int square);
     U64 CalcKnightAttacks(int square);
-    void InitLeaperAttacks();
+    U64 CalcRookAttacks(int square);
+
+    // Initializes the board and its pieces
     void InitializeBoard();
+
+    // Function that simply calls the different functions that initialize attack tables
+    void InitializeAttackSets();
+
+    // Initializes attack tables for different piece types. Slider(rook, queen, bishop), and leaper(king,
+    // knight, and pawn)
+    void InitLeaperAttacks();
+    void InitSliderAttacks();
+
+    // Initializes ray attacks for each square in every direction
+    void InitRayAttacks();
+    
+    // Gets a specific ray attack on a square in a direction (does not penetrate other pieces)
+    U64 GetDirRayAttacks(enumDirections direction, int square);
+
+    // Helper functions that perform bitscans either forward or reverse
+    int BitScan(U64 bitboard, bool reverse);
+    int bitScanReverse(U64 bitboard);
 };
