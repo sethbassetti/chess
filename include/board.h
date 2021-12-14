@@ -73,6 +73,8 @@ private:
     U64 king_attacks[64];
     U64 knight_attacks[64];
     U64 rook_attacks[64];
+    U64 bishop_attacks[64];
+    U64 queen_attacks[64];
 
     // Stores precalculated ray attack tables for each of the 8 directions
     U64 ray_attacks[64][8];
@@ -82,6 +84,8 @@ private:
     U64 CalcKingAttacks(int square);
     U64 CalcKnightAttacks(int square);
     U64 CalcRookAttacks(int square);
+    U64 CalcBishopAttacks(int square);
+    U64 CalcQueenAttacks(int square);
 
     // Initializes the board and its pieces
     void InitializeBoard();

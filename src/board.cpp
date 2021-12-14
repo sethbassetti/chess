@@ -125,14 +125,16 @@ void Board::Test(){
         for (int file = 0; file < 8; file++)
         {
             int square = rank * 8 + file;
-            if(rank + file == 7 && rank > 0){
+            if(rank == file && rank <7){
                 set_bit(test_board, square);
             }
         }
     }
     //PrintBoard(ray_attacks[g3][NoEa]);
     //PrintBoard(a_file | (a_file << 1) | (a_file << 2));
-    PrintBoard(test_board);
+    //U64 x = 2ULL;
+    //PrintBoard(x << -1);
+    PrintBoard(queen_attacks[a]);
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -276,6 +278,40 @@ U64 Board::CalcRookAttacks(int square){
     return attacks;
 }
 
+U64 Board::CalcBishopAttacks(int square){
+    // Stores the attacks
+    U64 attacks = 0ULL;
+
+    // Stores the piece on the square
+    U64 bitboard = 0ULL;
+
+    // set piece on board
+    set_bit(bitboard, square);
+
+    // Creates a vector of the rays to construct the attacks from
+    enumDirections dirs[4] = {NoWe, SoWe, SoEa, NoEa};
+
+    // Iterates over every direction to construct attack table
+    for (int i = 0; i < 4; i++){
+        
+        // Assigns the current direction to dir
+        enumDirections dir = dirs[i];
+        
+        // Gets the appropriate ray attack for the direction and square
+        U64 ray_attack = GetDirRayAttacks(dir, square);
+
+        // Adds the ray attack to the overall attacks table with a union
+        attacks |= ray_attack;
+    }
+
+    return attacks;
+}
+
+/* Unions the rook and bishop attacks to form queen attack table. NOTE: This function HAS to be called after
+the rook and bishop attack tables are built or it will construct the empty set */
+U64 Board::CalcQueenAttacks(int square){
+    return rook_attacks[square] | bishop_attacks[square];
+}
 /* Returns the ray attack in a given direction (N, NW, S, SE, etc...) from the given square.
 This function considers blocker pieces. Thus, the ray attacks only go as far as line of sight from the
 square allows */
@@ -354,17 +390,56 @@ void Board::InitRayAttacks(){
     // A line of ones extending northeastwards from a1
     U64 noea = 0x8040201008040200ULL;
     
+    // Iterates through every rank and file. Starts with a mask in the a_file, that is unioned
+    // with itself shifted one for every file. The negation of this is intersected with the original ray
+    // attack to prevent wrapping around.
     for (int rank = 0; rank < 8; rank++){
-        U64 wrap_mask = a_file;
-        for (int file = 0; file < 8; file++, noea <<= 1, wrap_mask|= wrap_mask << 1)
+        U64 wrap_mask = not_a_file;
+        for (int file = 0; file < 8; file++, noea <<= 1, wrap_mask&= wrap_mask << 1)
         {
-            ray_attacks[rank * 8 + file][NoEa] = noea & ~wrap_mask;
+            ray_attacks[rank * 8 + file][NoEa] = noea & wrap_mask;
         }
     }
 
+    U64 nowe = 0x102040810204000ULL;
+    U64 rank_nowe = nowe;
+
+    for (int rank = 0; rank < 8; rank++)
+    {
+        rank_nowe = nowe << (8 * rank);
+
+        U64 wrap_mask = not_h_file;
+        for (int file = 7; file >= 0; file--, rank_nowe >>= 1, wrap_mask &= wrap_mask >> 1)
+        {
+            int square = rank * 8 + file;
+            //printf("%d\n", square);
+            ray_attacks[square][NoWe] = rank_nowe & wrap_mask;
+        }
+    }
+
+    U64 soea = 0x2040810204080ULL;
+    U64 rank_soea;
+    for (int rank = 7; rank >= 0; rank--)
+    {
+        U64 wrap_mask = not_a_file;
+        rank_soea = soea >> ((7 - rank) * 8);
+        for (int file = 0; file < 8; file++, rank_soea <<= 1, wrap_mask &= wrap_mask << 1)
+        {
+            int square = rank * 8 + file;
+            ray_attacks[square][SoEa] = rank_soea & wrap_mask;
+        }
+    }
+
+    U64 sowe = 0x40201008040201ULL;
+    for (int rank = 7; rank >= 0; rank--){
+        U64 wrap_mask = not_h_file;
+        for (int file = 7; file >= 0; file--, sowe >>= 1, wrap_mask &= wrap_mask >> 1)
+        {
+            int square = rank*8 + file;
+            ray_attacks[square][SoWe] = sowe & wrap_mask;
+        }
+    }
 }
-
-
 
 /* Retrieves attack tables for slider pieces (bishop, rook, queen) */
 void Board::InitSliderAttacks(){
@@ -378,6 +453,8 @@ void Board::InitSliderAttacks(){
         for (int file = 0; file < 8; file++){
             int square = rank * 8 + file;
             rook_attacks[square] = CalcRookAttacks(square);
+            bishop_attacks[square] = CalcBishopAttacks(square);
+            queen_attacks[square] = CalcQueenAttacks(square);
         }
     }
 }
@@ -385,7 +462,6 @@ void Board::InitSliderAttacks(){
 /* Helper function used to find either the least significant bit (rightmost) or the most significant bit
 (leftmost) of a bitboard. bitscan reverse is used to find the MSB */
 int Board::BitScan(U64 bitboard, bool reverse=false){
-
 
     // If reverse is not true, do a forward bitscan with ffs() function. Subtract 1 to get 0 based index.
     if(!reverse){
