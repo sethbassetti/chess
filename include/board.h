@@ -143,4 +143,7 @@ private:
 
     void GeneratePawnMoves(int color, std::vector<Move>  &move_list);
     void GenerateKnightMoves(int color, std::vector<Move> &move_list);
+    void GenerateKingMoves(int color, std::vector<Move> &move_list);
+    void GenerateSliderMoves(int color, std::vector<Move> &move_list);
+
 };

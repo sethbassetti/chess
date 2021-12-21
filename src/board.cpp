@@ -35,8 +35,7 @@ void Board::InitializeBoard(){
     /* White pieces, black pieces, and all pieces */
     white_pieces = 0xFFFFULL;
     black_pieces = 0xFFFF000000000000LLU;
-    occupancy = white_pieces | black_pieces;
-    empty = ~occupancy;
+    
 
     /* white pieces */
     white_pawns    = 0xFF00LLU;
@@ -59,6 +58,8 @@ void Board::InitializeBoard(){
 void Board::InitializeAttackSets(){
     InitLeaperAttacks();
     InitSliderAttacks();
+    occupancy = white_pieces | black_pieces;
+    empty = ~occupancy;
 }
 
 /* Prints the board out in an 8x8 matrix format */
@@ -112,8 +113,15 @@ void Board::Test(){
             }
         }
     }
-    set_bit(black_pieces, e3);
-    set_bit(black_knights, e3);
+
+    set_bit(white_bishops, a6);
+    pop_bit(white_pawns, e2);
+    pop_bit(white_pieces, e2);
+    
+    set_bit(white_kings, e5);
+    empty = ~white_pieces & ~black_pieces;
+    InitializeAttackSets();
+
     vector<Move> moves = GenerateMoveList(white);
     printf("Num Moves: %ld\n", moves.size());
     for(Move move : moves){
@@ -533,23 +541,91 @@ void Board::CalcPawnPushes(){
 void Board::GenerateKnightMoves(int color, vector<Move> &move_list){
     U64 knights;
     U64 color_pieces;
+    U64 enemy_pieces;
     if (!color)
     {
         knights = white_knights;
         color_pieces = white_pieces;
-    }else{
+        enemy_pieces = black_pieces;
+    }
+    else
+    {
         knights = black_knights;
         color_pieces = black_pieces;
+        enemy_pieces = white_pieces;
     }
 
     vector<int> knight_indices = GetSetBits(knights);
     for(int knight : knight_indices){
-        for(int target : GetSetBits(knight_attacks[knight])){
-            int x = 1;
+        for(int target : GetSetBits(knight_attacks[knight] & ~color_pieces)){
+            Move move;
+            move.start = knight;
+            move.end = target;
+            move.capture = GetPieceType(target);
+            move.move_type = (move.capture) ? capture : quiet;
+            move_list.push_back(move);
         }
     }
 }
 
+void Board::GenerateKingMoves(int color, vector<Move> &move_list){
+    U64 king;
+    U64 color_pieces;
+    U64 enemy_pieces;
+    if (!color)
+    {
+        king = white_kings;
+        color_pieces = white_pieces;
+        enemy_pieces = black_pieces;
+    }
+    else
+    {
+        king = black_kings;
+        color_pieces = black_pieces;
+        enemy_pieces = white_pieces;
+    }
+
+    vector<int> king_indices = GetSetBits(king);
+    for(int king : king_indices){
+        for(int target : GetSetBits(king_attacks[king] & ~color_pieces)){
+            Move move;
+            move.start = king;
+            move.end = target;
+            move.capture = GetPieceType(target);
+            move.move_type = (move.capture) ? capture : quiet;
+            move_list.push_back(move);
+        }
+    }
+}
+
+void Board::GenerateSliderMoves(int color, vector<Move> &move_list){
+    U64 queens = black_queens;
+    U64 rooks = black_rooks;
+    U64 bishops = black_bishops;
+    U64 color_pieces = black_pieces;
+    U64 enemy_pieces = white_pieces;
+
+    if(!color){
+        queens = white_queens;
+        rooks = white_rooks;
+        bishops = white_bishops;
+        color_pieces = white_pieces;
+        enemy_pieces = black_pieces;
+    }
+
+    vector<int> queen_index = GetSetBits(queens);
+    vector<int> rook_index = GetSetBits(rooks);
+    vector<int> bishop_index = GetSetBits(bishops);
+    InitSliderAttacks();
+
+    for(int queen : queen_index){
+        vector<int> targets = GetSetBits(queen_attacks[queen]);
+        for(int target : targets){
+            
+
+        }
+    }
+}
 
 vector<Move> Board::GenerateMoveList(int color){
 
@@ -557,9 +633,15 @@ vector<Move> Board::GenerateMoveList(int color){
     vector<Move> move_list;
 
     // Adds all pawn moves for the color to the move list
-    GeneratePawnMoves(color, move_list);
+    //GeneratePawnMoves(color, move_list);
 
-    GenerateKnightMoves(color, move_list);
+    // Adds all knight moves for the color to the move list
+    //GenerateKnightMoves(color, move_list);
+
+    // Adds all king moves for the color to the move list
+    //GenerateKingMoves(color, move_list);
+
+    GenerateSliderMoves(color, move_list);
 
     return move_list;
 }
