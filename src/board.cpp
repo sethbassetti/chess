@@ -8,96 +8,25 @@
 #include <vector>
 #include "utils.h"
 #include "board.h"
+#include "position.h"
 
 
 using namespace std;
 
 
-const U64 a_file = 0x101010101010101ULL;        // All 1's in a file
-const U64 not_a_file = 0xfefefefefefefefeULL;   // All 1's except a file
-const U64 not_h_file = 0x7f7f7f7f7f7f7f7fULL;   // All 1's except h file
-const U64 not_ab_file = 0xfcfcfcfcfcfcfcfcULL;  // All 1's except ab files
-const U64 not_gh_file = 0x3f3f3f3f3f3f3f3fULL;  // All 1's except gh files
 
-// White is 0, black is 1
-enum{white, black};
-
-// Constructor for board, initializes piece sets and attack sets
+// Constructor for board, initializes board position and preset attack tables
 Board::Board(){
-    InitializeBoard();
-    InitializeAttackSets();
-}
-
-/* Initializes the piece sets for the board, constructs bitboards for all pieces as well as unions
-of pieces to form occupancy sets */
-void Board::InitializeBoard(){
-
-    /* White pieces, black pieces, and all pieces */
-    white_pieces = 0xFFFFULL;
-    black_pieces = 0xFFFF000000000000LLU;
     
+    // Constructs a position object that holds information about piece positions
+    position = Position();
 
-    /* white pieces */
-    white_pawns    = 0xFF00LLU;
-    white_knights  = 0x42LLU;
-    white_bishops  = 0x24LLU;
-    white_rooks    = 0x81LLU;
-    white_queens   = 0x8LLU;
-    white_kings    = 0x10LLU;
-
-    /* black pieces */
-    black_pawns    = 0xFF000000000000LLU;
-    black_knights  = 0x4200000000000000LLU;
-    black_bishops  = 0x2400000000000000LLU;
-    black_rooks    = 0x8100000000000000LLU;
-    black_queens   = 0x800000000000000LLU;
-    black_kings    = 0x1000000000000000LLU;
-}
-
-/* Initializes attack sets for leaper pieces and sliding pieces */
-void Board::InitializeAttackSets(){
+    // Initializes leaper attack tables, since they are independent of board position
     InitLeaperAttacks();
-    InitSliderAttacks();
-    occupancy = white_pieces | black_pieces;
-    empty = ~occupancy;
 }
 
-/* Prints the board out in an 8x8 matrix format */
-void Board::PrintBoard(U64 bitboard){
-   
 
-    // Iterates through each rank of the board
-    for(int rank=7; rank >= 0; rank--){
 
-        printf("\n");
-
-        // Iterates through each column of the board
-        for(int file=0; file < 8; file++){
-
-            // Convert file and rank into square index (0-63)
-            int square = rank * 8 + file;
-            
-
-            // Print rank labels (1-8)
-            if(!file){
-                printf("  %d  " , rank+1);
-            }
-            
-            // Prints the value of the bit at the given position
-            printf(" %d ", (get_bit(bitboard, square) ? 1 : 0));
-        }
-    }
-
-    // Print board file labels (A-H)
-    printf("\n\n      A  B  C  D  E  F  G  H\n\n");
-
-    // Prints out the binary representation of the board
-    cout << "Binary: " << bitset<64>(bitboard) << endl;
-
-    // Prints out hexadecimal representation of the board
-    printf("Hexadecimal: 0x%lxULL\n", bitboard);
-    
-}
 
 /* Test function for implementing and development */
 void Board::Test(){
@@ -114,22 +43,20 @@ void Board::Test(){
         }
     }
 
-    set_bit(black_queens, e6);
-    //pop_bit(white_pawns, e2);
-    //pop_bit(white_pieces, e2);
-    
-    set_bit(black_pieces, e6);
-    pop_bit(white_pawns, e2);
-    pop_bit(white_pieces, e2);
-    empty = ~white_pieces & ~black_pieces;
-    InitializeAttackSets();
 
     vector<Move> moves = GenerateMoveList(black);
     printf("Num Moves: %ld\n", moves.size());
     for(Move move : moves){
         printf("%d\n", move.capture);
     }
-    PrintBoard(white_pawns);
+    MakeMove(moves.at(17));
+    Move move = {d2, d4, quiet, blank, white};
+    MakeMove(move);
+    InitializeAttackSets();
+    Move capture_move = {c6, d4, capture, white_pawn, black};
+    MakeMove(capture_move);
+    InitializeAttackSets();
+    PrintBoard(position.white_pawns);
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -479,13 +406,13 @@ void Board::GeneratePawnMoves(int color, vector<Move> &moves){
     }
     
     // Serialize the pawns into a vector of their integer indices
-    vector<int> pawn_indices = GetSetBits(pawns);
+    vector<int> pawn_indices = SerializeBitboard(pawns);
 
     // Get pawn attacks
     for(int pawn : pawn_indices){
 
         // Iterates through each posible attack the pawn could make 
-        vector<int> attack_indices = GetSetBits(pawn_attacks[color][pawn]);
+        vector<int> attack_indices = SerializeBitboard(pawn_attacks[color][pawn]);
 
         // Iterates through the attacks, adding moves to the move list
         for(int target : attack_indices){
@@ -493,7 +420,7 @@ void Board::GeneratePawnMoves(int color, vector<Move> &moves){
             if(get_bit(enemy_pieces, target)){
                 // Retrieve which type of piece is being captured
                 int captured_piece = GetPieceType(target);
-                struct Move move = {pawn, target, capture, captured_piece};
+                struct Move move = {pawn, target, capture, captured_piece, color};
                 moves.push_back(move);
             }
         }
@@ -504,7 +431,7 @@ void Board::GeneratePawnMoves(int color, vector<Move> &moves){
     CalcPawnPushes();
 
     // Gets single pawn pushes
-    vector<int> single_pawn_push_indices = GetSetBits(single_pawn_pushes[color]);
+    vector<int> single_pawn_push_indices = SerializeBitboard(single_pawn_pushes[color]);
     
     // Iterates through every target within the pawn push table
     for(int target : single_pawn_push_indices){
@@ -512,16 +439,16 @@ void Board::GeneratePawnMoves(int color, vector<Move> &moves){
         // Subtract(for white), or adds (for black) 8 to get the rank either directly above or directly
         // below the target. This is because for a single pawn push, the origin will always be the previous rank
         int start = target - 8 * color_flag;
-        struct Move move = {start, target, quiet, blank};
+        struct Move move = {start, target, quiet, blank, color};
         moves.push_back(move);
     }
     // Gets double pawn push moves
-    vector<int> double_pawn_push_indices = GetSetBits(double_pawn_pushes[color]);
+    vector<int> double_pawn_push_indices = SerializeBitboard(double_pawn_pushes[color]);
     for(int target : double_pawn_push_indices){
         // Either subtracts or adds 16 to get the origin square two ranks above or below the target
         // square
         int start = target - 16 * color_flag;
-        struct Move move = {start, target, en_passant, blank};
+        struct Move move = {start, target, en_passant, blank, color};
         moves.push_back(move);
     }
 }
@@ -541,57 +468,17 @@ void Board::CalcPawnPushes(){
 
 
 void Board::GenerateKnightMoves(int color, vector<Move> &move_list){
-    U64 knights;
-    U64 color_pieces;
-    if (!color)
-    {
-        knights = white_knights;
-        color_pieces = white_pieces;
-    }
-    else
-    {
-        knights = black_knights;
-        color_pieces = black_pieces;
-    }
+    U64 knights = (!color) ? white_knights : black_knights;
 
-    vector<int> knight_indices = GetSetBits(knights);
-    for(int knight : knight_indices){
-        for(int target : GetSetBits(knight_attacks[knight] & ~color_pieces)){
-            Move move;
-            move.start = knight;
-            move.end = target;
-            move.capture = GetPieceType(target);
-            move.move_type = (move.capture) ? capture : quiet;
-            move_list.push_back(move);
-        }
-    }
+    vector<int> knight_indices = SerializeBitboard(knights);
+    FillMoveList(knight_indices, knight_attacks, color, move_list);
 }
 
 void Board::GenerateKingMoves(int color, vector<Move> &move_list){
-    U64 king;
-    U64 color_pieces;
-    if (!color)
-    {
-        king = white_kings;
-        color_pieces = white_pieces;
-    }
-    else
-    {
-        king = black_kings;
-        color_pieces = black_pieces;
-    }
+    U64 king = (!color) ? white_kings : black_kings;
 
-    vector<int> king_indices = GetSetBits(king);
-    for(int king : king_indices){
-        for(int target : GetSetBits(king_attacks[king] & ~color_pieces)){
-            Move move;
-            move.start = king;
-            move.end = target;
-            move.capture = GetPieceType(target);
-            move.move_type = (move.capture) ? capture : quiet;
-            move_list.push_back(move);
-        }
-    }
+    vector<int> king_indices = SerializeBitboard(king);
+    FillMoveList(king_indices, king_attacks, color, move_list);
 }
 
 void Board::GenerateSliderMoves(int color, vector<Move> &move_list){
@@ -605,9 +492,9 @@ void Board::GenerateSliderMoves(int color, vector<Move> &move_list){
         bishops = white_bishops;
     }
 
-    vector<int> queen_index = GetSetBits(queens);
-    vector<int> rook_index = GetSetBits(rooks);
-    vector<int> bishop_index = GetSetBits(bishops);
+    vector<int> queen_index = SerializeBitboard(queens);
+    vector<int> rook_index = SerializeBitboard(rooks);
+    vector<int> bishop_index = SerializeBitboard(bishops);
     InitSliderAttacks();
 
     FillMoveList(queen_index, queen_attacks, color, move_list);
@@ -623,13 +510,14 @@ void Board::FillMoveList(vector<int> piece_list, U64 attack_map[64], int color, 
     }
 
     for(int piece : piece_list){
-        vector<int> targets = GetSetBits(attack_map[piece] & ~color_pieces);
+        vector<int> targets = SerializeBitboard(attack_map[piece] & ~color_pieces);
         for(int target : targets){
             Move move;
             move.start = piece;
             move.end = target;
             move.capture = GetPieceType(target);
             move.move_type = (move.capture) ? capture : quiet;
+            move.color = color;
             move_list.push_back(move);
         }
     }
@@ -640,13 +528,13 @@ vector<Move> Board::GenerateMoveList(int color){
     vector<Move> move_list;
 
     // Adds all pawn moves for the color to the move list
-    //GeneratePawnMoves(color, move_list);
+    GeneratePawnMoves(color, move_list);
 
     // Adds all knight moves for the color to the move list
-    //GenerateKnightMoves(color, move_list);
+    GenerateKnightMoves(color, move_list);
 
     // Adds all king moves for the color to the move list
-    //GenerateKingMoves(color, move_list);
+    GenerateKingMoves(color, move_list);
 
     GenerateSliderMoves(color, move_list);
 
@@ -663,4 +551,38 @@ int Board::GetPieceType(int index){
         }
     }
     return 0;
+}
+
+void Board::MakeMove(Move move){
+    
+    U64 null = 0ULL;
+    U64 piece_boards[13] = {null, white_pawns, white_rooks, white_knights, white_bishops, white_queens, white_kings,
+                            black_pawns, black_rooks, black_knights, black_bishops, black_queens, black_kings};
+    int moving_piece = GetPieceType(move.start);
+    int captured_piece = GetPieceType(move.end);
+    U64 moving_piece_board = piece_boards[moving_piece];
+    U64 captured_piece_board = piece_boards[captured_piece];
+    if (move.color == white)
+    {
+        pop_bit(white_pieces, move.start);
+        pop_bit(black_pieces, move.end);
+        pop_bit(captured_piece_board, move.end);
+        set_bit(white_pieces, move.end);
+        set_bit(moving_piece_board, move.end);
+    }
+    else
+    {
+        pop_bit(black_pieces, move.start);
+        pop_bit(white_pieces, move.end);
+        pop_bit(captured_piece_board, move.end);
+        set_bit(black_pieces, move.end);
+        set_bit(moving_piece_board, move.end);
+    }
+    piece_boards[1] = 0ULL;
+}
+
+    void Board::UnMakeMove(Move move)
+    {
+
+
 }

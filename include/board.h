@@ -1,5 +1,6 @@
 #include <vector>
 #include "utils.h"
+#include "position.h"
 
 #pragma once
 
@@ -9,6 +10,7 @@ struct Move{
     int end;
     int move_type;
     int capture;
+    int color;
 };
 
 enum moveType
@@ -19,9 +21,8 @@ enum moveType
     castle
 };
 
-enum pieces
+enum pieceType
 {
-    blank,
     white_pawn,
     white_rook,
     white_knight,
@@ -73,27 +74,7 @@ public:
     void Test();
 
 private:
-    /* Combined pieces */
-    U64 white_pieces;
-    U64 black_pieces;
-    U64 occupancy;
-    U64 empty;
-
-    /* white pieces */
-    U64 white_pawns;
-    U64 white_knights;
-    U64 white_bishops;
-    U64 white_rooks;
-    U64 white_queens;
-    U64 white_kings;
-
-    /* black pieces */
-    U64 black_pawns;
-    U64 black_knights;
-    U64 black_bishops;
-    U64 black_rooks;
-    U64 black_queens;
-    U64 black_kings;
+    Position position;
 
     // Stores precalculated attack tables for various pieces
     U64 pawn_attacks[2][64];    // Moves of pawns depend on their color so we need two sides.
@@ -147,4 +128,7 @@ private:
     void GenerateSliderMoves(int color, std::vector<Move> &move_list);
 
     void FillMoveList(std::vector<int> piece_indices, U64 attack_map[64], int color, std::vector<Move> &move_list);
+
+    void MakeMove(Move move);
+    void UnMakeMove(Move move);
 };
