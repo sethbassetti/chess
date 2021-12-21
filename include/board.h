@@ -146,4 +146,5 @@ private:
     void GenerateKingMoves(int color, std::vector<Move> &move_list);
     void GenerateSliderMoves(int color, std::vector<Move> &move_list);
 
+    void FillMoveList(std::vector<int> piece_indices, U64 attack_map[64], int color, std::vector<Move> &move_list);
 };

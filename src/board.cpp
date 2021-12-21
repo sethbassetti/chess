@@ -114,15 +114,17 @@ void Board::Test(){
         }
     }
 
-    set_bit(white_bishops, a6);
+    set_bit(black_queens, e6);
+    //pop_bit(white_pawns, e2);
+    //pop_bit(white_pieces, e2);
+    
+    set_bit(black_pieces, e6);
     pop_bit(white_pawns, e2);
     pop_bit(white_pieces, e2);
-    
-    set_bit(white_kings, e5);
     empty = ~white_pieces & ~black_pieces;
     InitializeAttackSets();
 
-    vector<Move> moves = GenerateMoveList(white);
+    vector<Move> moves = GenerateMoveList(black);
     printf("Num Moves: %ld\n", moves.size());
     for(Move move : moves){
         printf("%d\n", move.capture);
@@ -541,18 +543,15 @@ void Board::CalcPawnPushes(){
 void Board::GenerateKnightMoves(int color, vector<Move> &move_list){
     U64 knights;
     U64 color_pieces;
-    U64 enemy_pieces;
     if (!color)
     {
         knights = white_knights;
         color_pieces = white_pieces;
-        enemy_pieces = black_pieces;
     }
     else
     {
         knights = black_knights;
         color_pieces = black_pieces;
-        enemy_pieces = white_pieces;
     }
 
     vector<int> knight_indices = GetSetBits(knights);
@@ -571,18 +570,15 @@ void Board::GenerateKnightMoves(int color, vector<Move> &move_list){
 void Board::GenerateKingMoves(int color, vector<Move> &move_list){
     U64 king;
     U64 color_pieces;
-    U64 enemy_pieces;
     if (!color)
     {
         king = white_kings;
         color_pieces = white_pieces;
-        enemy_pieces = black_pieces;
     }
     else
     {
         king = black_kings;
         color_pieces = black_pieces;
-        enemy_pieces = white_pieces;
     }
 
     vector<int> king_indices = GetSetBits(king);
@@ -602,15 +598,11 @@ void Board::GenerateSliderMoves(int color, vector<Move> &move_list){
     U64 queens = black_queens;
     U64 rooks = black_rooks;
     U64 bishops = black_bishops;
-    U64 color_pieces = black_pieces;
-    U64 enemy_pieces = white_pieces;
 
     if(!color){
         queens = white_queens;
         rooks = white_rooks;
         bishops = white_bishops;
-        color_pieces = white_pieces;
-        enemy_pieces = black_pieces;
     }
 
     vector<int> queen_index = GetSetBits(queens);
@@ -618,15 +610,30 @@ void Board::GenerateSliderMoves(int color, vector<Move> &move_list){
     vector<int> bishop_index = GetSetBits(bishops);
     InitSliderAttacks();
 
-    for(int queen : queen_index){
-        vector<int> targets = GetSetBits(queen_attacks[queen]);
-        for(int target : targets){
-            
+    FillMoveList(queen_index, queen_attacks, color, move_list);
+    FillMoveList(rook_index, rook_attacks, color, move_list);
+    FillMoveList(bishop_index, bishop_attacks, color,  move_list);
+}
 
+void Board::FillMoveList(vector<int> piece_list, U64 attack_map[64], int color, vector<Move> &move_list){
+    U64 color_pieces = black_pieces;
+    if (!color)
+    {
+        color_pieces = white_pieces;
+    }
+
+    for(int piece : piece_list){
+        vector<int> targets = GetSetBits(attack_map[piece] & ~color_pieces);
+        for(int target : targets){
+            Move move;
+            move.start = piece;
+            move.end = target;
+            move.capture = GetPieceType(target);
+            move.move_type = (move.capture) ? capture : quiet;
+            move_list.push_back(move);
         }
     }
 }
-
 vector<Move> Board::GenerateMoveList(int color){
 
     vector<U64> piece_bitboards;
