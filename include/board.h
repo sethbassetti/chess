@@ -1,13 +1,39 @@
-#pragma once
+#include <vector>
+#include "utils.h"
 
-// Defines a type that can only hold a 64 bit integer
-typedef uint64_t U64;
+#pragma once
 
 // Contains information that represents a move
 struct Move{
-    U64 start;
-    U64 end;
+    int start;
+    int end;
     int move_type;
+    int capture;
+};
+
+enum moveType
+{
+    quiet,
+    capture,
+    en_passant,
+    castle
+};
+
+enum pieces
+{
+    blank,
+    white_pawn,
+    white_rook,
+    white_knight,
+    white_bishop,
+    white_queen,
+    white_king,
+    black_pawn,
+    black_rook,
+    black_knight,
+    black_bishop,
+    black_queen,
+    black_king
 };
 
 // Enumerates everything on the board so it can be described with numbers or letters
@@ -51,6 +77,7 @@ private:
     U64 white_pieces;
     U64 black_pieces;
     U64 occupancy;
+    U64 empty;
 
     /* white pieces */
     U64 white_pawns;
@@ -76,6 +103,10 @@ private:
     U64 bishop_attacks[64];
     U64 queen_attacks[64];
 
+    // Stores where pawns can be pushed to (not diagonal attacks)
+    U64 single_pawn_pushes[2];
+    U64 double_pawn_pushes[2];
+
     // Stores precalculated ray attack tables for each of the 8 directions
     U64 ray_attacks[64][8];
 
@@ -86,6 +117,8 @@ private:
     U64 CalcRookAttacks(int square);
     U64 CalcBishopAttacks(int square);
     U64 CalcQueenAttacks(int square);
+
+    void CalcPawnPushes();
 
     // Initializes the board and its pieces
     void InitializeBoard();
@@ -104,7 +137,10 @@ private:
     // Gets a specific ray attack on a square in a direction (does not penetrate other pieces)
     U64 GetDirRayAttacks(enumDirections direction, int square);
 
-    // Helper functions that perform bitscans either forward or reverse
-    int BitScan(U64 bitboard, bool reverse);
-    int bitScanReverse(U64 bitboard);
+    std::vector<Move> GenerateMoveList(int color);
+
+    int GetPieceType(int index);
+
+    void GeneratePawnMoves(int color, std::vector<Move>  &move_list);
+    void GenerateKnightMoves(int color, std::vector<Move> &move_list);
 };

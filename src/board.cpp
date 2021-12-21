@@ -5,38 +5,19 @@
 #include <strings.h>
 #include <string.h>
 #include <assert.h>  
+#include <vector>
+#include "utils.h"
 #include "board.h"
+
 
 using namespace std;
 
-//Macro that returns the bit of the bitboard at the square
-#define get_bit(bitboard, square)(bitboard & (1ULL << square))
-
-// Macro that sets a bit to 1 at a particular square
-#define set_bit(bitboard, square)(bitboard |= (1ULL << square))
-
-// Macro that pops a bit to 0 at a particular square
-#define pop_bit(bitboard, square)(bitboard &= ~(1ULL << square))
-
-// Macro that defines whether direction is negative ray direction, bases it off enum number
-#define is_negative(dir)(dir > 3)
 
 const U64 a_file = 0x101010101010101ULL;        // All 1's in a file
 const U64 not_a_file = 0xfefefefefefefefeULL;   // All 1's except a file
 const U64 not_h_file = 0x7f7f7f7f7f7f7f7fULL;   // All 1's except h file
 const U64 not_ab_file = 0xfcfcfcfcfcfcfcfcULL;  // All 1's except ab files
 const U64 not_gh_file = 0x3f3f3f3f3f3f3f3fULL;  // All 1's except gh files
-
-const int index64[64] = {
-    0, 47,  1, 56, 48, 27,  2, 60,
-   57, 49, 41, 37, 28, 16,  3, 61,
-   54, 58, 35, 52, 50, 42, 21, 44,
-   38, 32, 29, 23, 17, 11,  4, 62,
-   46, 55, 26, 59, 40, 36, 15, 53,
-   34, 51, 20, 43, 31, 22, 10, 45,
-   25, 39, 14, 33, 19, 30,  9, 24,
-   13, 18,  8, 12,  7,  6,  5, 63
-};
 
 // White is 0, black is 1
 enum{white, black};
@@ -55,6 +36,7 @@ void Board::InitializeBoard(){
     white_pieces = 0xFFFFULL;
     black_pieces = 0xFFFF000000000000LLU;
     occupancy = white_pieces | black_pieces;
+    empty = ~occupancy;
 
     /* white pieces */
     white_pawns    = 0xFF00LLU;
@@ -130,11 +112,14 @@ void Board::Test(){
             }
         }
     }
-    //PrintBoard(ray_attacks[g3][NoEa]);
-    //PrintBoard(a_file | (a_file << 1) | (a_file << 2));
-    //U64 x = 2ULL;
-    //PrintBoard(x << -1);
-    PrintBoard(queen_attacks[a]);
+    set_bit(black_pieces, e3);
+    set_bit(black_knights, e3);
+    vector<Move> moves = GenerateMoveList(white);
+    printf("Num Moves: %ld\n", moves.size());
+    for(Move move : moves){
+        printf("%d\n", move.capture);
+    }
+    PrintBoard(white_pawns);
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -455,21 +440,138 @@ void Board::InitSliderAttacks(){
             rook_attacks[square] = CalcRookAttacks(square);
             bishop_attacks[square] = CalcBishopAttacks(square);
             queen_attacks[square] = CalcQueenAttacks(square);
+            CalcPawnPushes();
         }
     }
 }
 
-/* Helper function used to find either the least significant bit (rightmost) or the most significant bit
-(leftmost) of a bitboard. bitscan reverse is used to find the MSB */
-int Board::BitScan(U64 bitboard, bool reverse=false){
+/* Given a color and reference to a move list, populates the move list
+with all pawn moves of the given color */
+void Board::GeneratePawnMoves(int color, vector<Move> &moves){
 
-    // If reverse is not true, do a forward bitscan with ffs() function. Subtract 1 to get 0 based index.
-    if(!reverse){
-        return __builtin_ffsll(bitboard) - 1;
+    /* generic variables for bitboards that are set to either white or black respectively */
+    U64 pawns;
+    U64 enemy_pieces;
+    int color_flag;
+
+    // If white, pawns are white pawns, enemy is black pieces and color flag is 1 (for pushes later)
+    if(!color){
+        pawns = white_pawns;
+        enemy_pieces =  black_pieces;
+        color_flag = 1;
     }
-    // Uses builtin function that returns trailing zeros from most significant bit. Need to subtract
-    // from 63 to get correct 0 based index.
-    else{
-        return 63 - __builtin_clzll(bitboard);
+    // Otherwise, reverse the above
+    else
+    {
+        pawns = black_pawns;
+        enemy_pieces = white_pieces;
+        color_flag = -1;
     }
+    
+    // Serialize the pawns into a vector of their integer indices
+    vector<int> pawn_indices = GetSetBits(pawns);
+
+    // Get pawn attacks
+    for(int pawn : pawn_indices){
+
+        // Iterates through each posible attack the pawn could make 
+        vector<int> attack_indices = GetSetBits(pawn_attacks[color][pawn]);
+
+        // Iterates through the attacks, adding moves to the move list
+        for(int target : attack_indices){
+            // If the bit is set on enemy pieces, this is a capture
+            if(get_bit(enemy_pieces, target)){
+                // Retrieve which type of piece is being captured
+                int captured_piece = GetPieceType(target);
+                struct Move move = {pawn, target, capture, captured_piece};
+                moves.push_back(move);
+            }
+        }
+    }
+        
+
+    // Calls CalcPawnPushes() to construct setwise pawn push tables
+    CalcPawnPushes();
+
+    // Gets single pawn pushes
+    vector<int> single_pawn_push_indices = GetSetBits(single_pawn_pushes[color]);
+    
+    // Iterates through every target within the pawn push table
+    for(int target : single_pawn_push_indices){
+
+        // Subtract(for white), or adds (for black) 8 to get the rank either directly above or directly
+        // below the target. This is because for a single pawn push, the origin will always be the previous rank
+        int start = target - 8 * color_flag;
+        struct Move move = {start, target, quiet, blank};
+        moves.push_back(move);
+    }
+    // Gets double pawn push moves
+    vector<int> double_pawn_push_indices = GetSetBits(double_pawn_pushes[color]);
+    for(int target : double_pawn_push_indices){
+        // Either subtracts or adds 16 to get the origin square two ranks above or below the target
+        // square
+        int start = target - 16 * color_flag;
+        struct Move move = {start, target, en_passant, blank};
+        moves.push_back(move);
+    }
+}
+
+void Board::CalcPawnPushes(){
+
+    U64 rank4 = 0x00000000FF000000ULL;
+    U64 rank5 = 0x000000FF00000000ULL;
+
+    single_pawn_pushes[white] = (white_pawns << 8) & empty;
+    single_pawn_pushes[black] = (black_pawns >> 8) & empty;
+
+    double_pawn_pushes[white] = (single_pawn_pushes[white] << 8) & empty & rank4;
+    double_pawn_pushes[black] = (single_pawn_pushes[black] >> 8) & empty & rank5;
+
+}
+
+
+void Board::GenerateKnightMoves(int color, vector<Move> &move_list){
+    U64 knights;
+    U64 color_pieces;
+    if (!color)
+    {
+        knights = white_knights;
+        color_pieces = white_pieces;
+    }else{
+        knights = black_knights;
+        color_pieces = black_pieces;
+    }
+
+    vector<int> knight_indices = GetSetBits(knights);
+    for(int knight : knight_indices){
+        for(int target : GetSetBits(knight_attacks[knight])){
+            int x = 1;
+        }
+    }
+}
+
+
+vector<Move> Board::GenerateMoveList(int color){
+
+    vector<U64> piece_bitboards;
+    vector<Move> move_list;
+
+    // Adds all pawn moves for the color to the move list
+    GeneratePawnMoves(color, move_list);
+
+    GenerateKnightMoves(color, move_list);
+
+    return move_list;
+}
+
+int Board::GetPieceType(int index){
+    U64 null = 0ULL;
+    U64 piece_boards[13] = {null, white_pawns, white_rooks, white_knights, white_bishops, white_queens, white_kings,
+                            black_pawns, black_rooks, black_knights, black_bishops, black_queens, black_kings};
+    for (int i = 0; i < 13; i++){
+        if(get_bit(piece_boards[i], index)){
+            return i;
+        }
+    }
+    return 0;
 }
