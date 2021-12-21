@@ -17,6 +17,7 @@ enum Color{white, black};
 // Enumerates all possible kinds of pieces
 enum pieceType
 {
+    blank,
     white_pawn,
     white_rook,
     white_knight,

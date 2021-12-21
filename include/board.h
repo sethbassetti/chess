@@ -21,21 +21,6 @@ enum moveType
     castle
 };
 
-enum pieceType
-{
-    white_pawn,
-    white_rook,
-    white_knight,
-    white_bishop,
-    white_queen,
-    white_king,
-    black_pawn,
-    black_rook,
-    black_knight,
-    black_bishop,
-    black_queen,
-    black_king
-};
 
 // Enumerates everything on the board so it can be described with numbers or letters
 enum enumSquare{
@@ -69,8 +54,6 @@ public:
     // Constructor function for board. Takes care of setting everything up.
     Board();
 
-    // Helper function that prints a bitboard in a pretty format
-    void PrintBoard(U64 bitboard);
     void Test();
 
 private:
@@ -104,8 +87,7 @@ private:
     // Initializes the board and its pieces
     void InitializeBoard();
 
-    // Function that simply calls the different functions that initialize attack tables
-    void InitializeAttackSets();
+
 
     // Initializes attack tables for different piece types. Slider(rook, queen, bishop), and leaper(king,
     // knight, and pawn)

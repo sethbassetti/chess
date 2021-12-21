@@ -44,19 +44,18 @@ void Board::Test(){
     }
 
 
-    vector<Move> moves = GenerateMoveList(black);
+    vector<Move> moves = GenerateMoveList(white);
     printf("Num Moves: %ld\n", moves.size());
     for(Move move : moves){
-        printf("%d\n", move.capture);
+        printf("%d\n", move.start);
     }
-    MakeMove(moves.at(17));
-    Move move = {d2, d4, quiet, blank, white};
-    MakeMove(move);
-    InitializeAttackSets();
-    Move capture_move = {c6, d4, capture, white_pawn, black};
+    Move blackPawn = {e7, e5, quiet, blank, black};
+    Move capture_move = {f3, e5, capture, black_pawn, white};
+    MakeMove(moves[18]);
+    MakeMove(blackPawn);
     MakeMove(capture_move);
-    InitializeAttackSets();
-    PrintBoard(position.white_pawns);
+    PrintBoard(position.colors[black]);
+    PrintBoard(position.occupancy);
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -243,7 +242,7 @@ U64 Board::GetDirRayAttacks(enumDirections dir, int square){
     U64 ray_attack = ray_attacks[square][dir];
 
     // Calculates every piece that ray can hit with intersection of ray attack and occupancy    
-    U64 blocker = ray_attack & occupancy;
+    U64 blocker = ray_attack & position.occupancy;
 
     // If there is a blocker, make sure ray attack cannot go through that square
     if(blocker){
@@ -393,15 +392,15 @@ void Board::GeneratePawnMoves(int color, vector<Move> &moves){
 
     // If white, pawns are white pawns, enemy is black pieces and color flag is 1 (for pushes later)
     if(!color){
-        pawns = white_pawns;
-        enemy_pieces =  black_pieces;
+        pawns = position.pieces[white_pawn];
+        enemy_pieces =  position.colors[black];
         color_flag = 1;
     }
     // Otherwise, reverse the above
     else
     {
-        pawns = black_pawns;
-        enemy_pieces = white_pieces;
+        pawns = position.pieces[black_pawn];
+        enemy_pieces = position.colors[white];
         color_flag = -1;
     }
     
@@ -457,39 +456,41 @@ void Board::CalcPawnPushes(){
 
     U64 rank4 = 0x00000000FF000000ULL;
     U64 rank5 = 0x000000FF00000000ULL;
+    U64 white_pawns = position.pieces[white_pawn];
+    U64 black_pawns = position.pieces[black_pawn];
 
-    single_pawn_pushes[white] = (white_pawns << 8) & empty;
-    single_pawn_pushes[black] = (black_pawns >> 8) & empty;
+    single_pawn_pushes[white] = (white_pawns << 8) & position.empty;
+    single_pawn_pushes[black] = (black_pawns >> 8) & position.empty;
 
-    double_pawn_pushes[white] = (single_pawn_pushes[white] << 8) & empty & rank4;
-    double_pawn_pushes[black] = (single_pawn_pushes[black] >> 8) & empty & rank5;
+    double_pawn_pushes[white] = (single_pawn_pushes[white] << 8) & position.empty & rank4;
+    double_pawn_pushes[black] = (single_pawn_pushes[black] >> 8) & position.empty & rank5;
 
 }
 
 
 void Board::GenerateKnightMoves(int color, vector<Move> &move_list){
-    U64 knights = (!color) ? white_knights : black_knights;
+    U64 knights = (!color) ? position.pieces[white_knight] : position.pieces[black_knight];
 
     vector<int> knight_indices = SerializeBitboard(knights);
     FillMoveList(knight_indices, knight_attacks, color, move_list);
 }
 
 void Board::GenerateKingMoves(int color, vector<Move> &move_list){
-    U64 king = (!color) ? white_kings : black_kings;
+    U64 king = (!color) ? position.pieces[white_king] : position.pieces[black_king];
 
     vector<int> king_indices = SerializeBitboard(king);
     FillMoveList(king_indices, king_attacks, color, move_list);
 }
 
 void Board::GenerateSliderMoves(int color, vector<Move> &move_list){
-    U64 queens = black_queens;
-    U64 rooks = black_rooks;
-    U64 bishops = black_bishops;
+    U64 queens = position.pieces[black_queen];
+    U64 rooks = position.pieces[black_rook];
+    U64 bishops = position.pieces[black_bishop];
 
     if(!color){
-        queens = white_queens;
-        rooks = white_rooks;
-        bishops = white_bishops;
+        queens = position.pieces[white_queen];
+        rooks = position.pieces[white_rook];
+        bishops = position.pieces[white_bishop];
     }
 
     vector<int> queen_index = SerializeBitboard(queens);
@@ -503,10 +504,10 @@ void Board::GenerateSliderMoves(int color, vector<Move> &move_list){
 }
 
 void Board::FillMoveList(vector<int> piece_list, U64 attack_map[64], int color, vector<Move> &move_list){
-    U64 color_pieces = black_pieces;
+    U64 color_pieces = position.colors[black];
     if (!color)
     {
-        color_pieces = white_pieces;
+        color_pieces = position.colors[white];
     }
 
     for(int piece : piece_list){
@@ -542,11 +543,9 @@ vector<Move> Board::GenerateMoveList(int color){
 }
 
 int Board::GetPieceType(int index){
-    U64 null = 0ULL;
-    U64 piece_boards[13] = {null, white_pawns, white_rooks, white_knights, white_bishops, white_queens, white_kings,
-                            black_pawns, black_rooks, black_knights, black_bishops, black_queens, black_kings};
+
     for (int i = 0; i < 13; i++){
-        if(get_bit(piece_boards[i], index)){
+        if(get_bit(position.pieces[i], index)){
             return i;
         }
     }
@@ -554,31 +553,26 @@ int Board::GetPieceType(int index){
 }
 
 void Board::MakeMove(Move move){
-    
-    U64 null = 0ULL;
-    U64 piece_boards[13] = {null, white_pawns, white_rooks, white_knights, white_bishops, white_queens, white_kings,
-                            black_pawns, black_rooks, black_knights, black_bishops, black_queens, black_kings};
-    int moving_piece = GetPieceType(move.start);
-    int captured_piece = GetPieceType(move.end);
-    U64 moving_piece_board = piece_boards[moving_piece];
-    U64 captured_piece_board = piece_boards[captured_piece];
-    if (move.color == white)
-    {
-        pop_bit(white_pieces, move.start);
-        pop_bit(black_pieces, move.end);
-        pop_bit(captured_piece_board, move.end);
-        set_bit(white_pieces, move.end);
-        set_bit(moving_piece_board, move.end);
+
+    // Gets the type of piece being moves to update it's bitboard
+    int moving_piece_type = GetPieceType(move.start);
+    int captured_piece_type = GetPieceType(move.end);
+    int enemy_color = (move.color == white) ? black : white;
+
+    // Pop the bit from both its piece bitboard and color bitboard
+    pop_bit(position.colors[move.color], move.start);
+    pop_bit(position.pieces[moving_piece_type], move.start);
+
+    // If the captured piece type is not 0 (indicating a blank) remove it from its respective bitboards
+    if(captured_piece_type){
+        pop_bit(position.pieces[captured_piece_type], move.end);
+        pop_bit(position.colors[enemy_color], move.end);
     }
-    else
-    {
-        pop_bit(black_pieces, move.start);
-        pop_bit(white_pieces, move.end);
-        pop_bit(captured_piece_board, move.end);
-        set_bit(black_pieces, move.end);
-        set_bit(moving_piece_board, move.end);
-    }
-    piece_boards[1] = 0ULL;
+
+    // Sets the moving piece bit from both its piece and color bitboard
+    set_bit(position.colors[move.color], move.end);
+    set_bit(position.pieces[moving_piece_type], move.end);
+    position.ResetOccupancy();
 }
 
     void Board::UnMakeMove(Move move)

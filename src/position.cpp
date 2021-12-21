@@ -22,6 +22,15 @@ Position::Position(){
     black_queens   = 0x800000000000000LLU;
     black_kings    = 0x1000000000000000LLU;
 
-    occupancy = white_pieces | black_pieces;
+
+    U64 null = 0ULL;
+    pieces = {null, white_pawns, white_rooks, white_knights, white_bishops, white_queens, white_kings,
+              black_pawns, black_rooks, black_knights, black_bishops, black_queens, black_kings};
+    colors = {white_pieces, black_pieces};
+    ResetOccupancy();
+}
+
+void Position::ResetOccupancy(){
+    occupancy = colors[white] | colors[black];
     empty = ~occupancy;
 }
