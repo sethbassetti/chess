@@ -12,7 +12,8 @@ enum moveType
     double_pawn_push,
     capture,
     ep_capture,
-    castle
+    castle,
+    promotion
 };
 
 
@@ -111,7 +112,10 @@ private:
     void FillMoveList(std::vector<int> piece_indices, U64 attack_map[64], std::vector<Move> &move_list);
 
     void MakeMove(Move move);
+    void MakeMove(int start, int end);
     void UnMakeMove(Move move);
+
+    void ParseLegalMoves(std::vector<Move> &move_list);
 
     bool KingInCheck(int color);
 

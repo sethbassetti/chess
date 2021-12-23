@@ -30,6 +30,9 @@ Board::Board(){
 
     // Initializes leaper attack tables, since they are independent of board position
     InitLeaperAttacks();
+
+    // Initializes precalculated ray attack lookup tables
+    InitRayAttacks();
 }
 
 /* Test function for implementing and development */
@@ -47,7 +50,8 @@ void Board::Test(){
         }
         printf("\n");
     }*/
-    perft_test(5);
+
+perft_test(5);
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -357,8 +361,7 @@ void Board::InitRayAttacks(){
 /* Retrieves attack tables for slider pieces (bishop, rook, queen) */
 void Board::InitSliderAttacks(){
 
-    // Initializes precalculated ray attack lookup tables
-    InitRayAttacks();
+    
 
     // Constructs rook attack table for every square on board
     for (int rank = 0; rank < 8; rank++)
@@ -368,7 +371,6 @@ void Board::InitSliderAttacks(){
             rook_attacks[square] = CalcRookAttacks(square);
             bishop_attacks[square] = CalcBishopAttacks(square);
             queen_attacks[square] = CalcQueenAttacks(square);
-            CalcPawnPushes();
         }
     }
 }
@@ -406,14 +408,13 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
                 struct Move move = {pawn, target, capture, captured_piece};
                 moves.push_back(move);
 
-            }/*g
+            }
             if(en_passant_flag && (target == en_passant_square)){
-                printf("Hello\n");
                 int offset = (turn_to_move == white) ? -8 : 8;
                 int captured_piece = position.GetPieceType(target + offset);
-                struct Move move = {pawn, target, ep_capture, captured_piece, color};
+                struct Move move = {pawn, target, ep_capture, captured_piece};
                 moves.push_back(move);
-            }*/
+            }
         }
 
     }
@@ -506,7 +507,12 @@ void Board::FillMoveList(vector<int> piece_list, U64 attack_map[64], vector<Move
     {
         vector<int> targets = SerializeBitboard(attack_map[piece] & ~color_pieces);
         for(int target : targets){
-            Move move = {piece, target, quiet, position.GetPieceType(target)};
+            int captured_piece = position.GetPieceType(target);
+            Move move = {piece, target, quiet, captured_piece};
+            if(captured_piece){
+                move.move_type = capture;
+            }
+
             move_list.push_back(move);
         }
     }
@@ -527,7 +533,29 @@ vector<Move> Board::GenerateMoveList(){
 
     GenerateSliderMoves(move_list);
 
+    ParseLegalMoves(move_list);
+
     return move_list;
+}
+
+void Board::ParseLegalMoves(vector<Move> &move_list){
+    vector<int> moves_to_delete;
+    auto current_move = move_list.begin();
+    while (current_move != move_list.end()){
+        Move move = *current_move;
+        MakeMove(move);
+        if(!KingInCheck(turn_to_move ^ 1)){
+            current_move++;
+            UnMakeMove(move);
+            continue;
+        }
+        else
+        {
+            current_move = move_list.erase(current_move);
+            UnMakeMove(move);
+            continue;
+        }
+    }
 }
 
 
@@ -566,9 +594,20 @@ void Board::MakeMove(Move move){
         en_passant_flag = false;
     }
     position.ResetOccupancy();
-    InitSliderAttacks();
+
     ToggleMove();
 
+}
+
+void Board::MakeMove(int start, int end){
+    vector<Move> moves = GenerateMoveList();
+    for(Move move : moves){
+        if(start == move.start && end == move.end){
+            MakeMove(move);
+            return;
+        }
+    }
+    printf("Invalid Move!\n");
 }
 
 void Board::UnMakeMove(Move move)
@@ -587,15 +626,19 @@ void Board::UnMakeMove(Move move)
     pop_bit(position.pieces[moving_piece_type], move.end);
     pop_bit(position.colors[piece_color], move.end);
 
-    if(move.capture){
+    if(move.move_type == capture){
         set_bit(position.pieces[move.capture], move.end);
         set_bit(position.colors[enemy_color], move.end);
+    }else if(move.move_type == ep_capture){
+        int offset = (piece_color == white) ? -8 : 8;
+        set_bit(position.pieces[move.capture], (move.end + offset));
+        set_bit(position.colors[enemy_color], (move.end + offset));
     }
     ToggleMove();
 }
 
 bool Board::KingInCheck(int color){
-
+    InitSliderAttacks();
     int offset = 6 * color;
     int enemy_offset = 6 * (color ^ 1);
 
@@ -630,7 +673,7 @@ bool Board::KingInCheck(int color){
     }
 
     U64 enemy_queens = position.pieces[white_queen + enemy_offset];
-    if(bishop_attacks[king_square] & enemy_queens){
+    if(queen_attacks[king_square] & enemy_queens){
         return true;
     }
 
@@ -646,16 +689,18 @@ int Board::perft(int depth){
     }
 
     vector<Move> moves = GenerateMoveList();
+    if(moves.size() == 0){
+        checkmates += 1;
+    }
     for (Move move : moves)
     {
         MakeMove(move);
         
-        if(!KingInCheck(turn_to_move ^ 1)){
-            if(move.move_type == capture && depth==1){
-                captures += 1;
-            }
-            nodes += perft(depth - 1);
+        if(move.move_type == capture && depth==1){
+            captures += 1;
         }
+        nodes += perft(depth - 1);
+        
         
         UnMakeMove(move);
     }
