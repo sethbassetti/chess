@@ -4,20 +4,14 @@
 
 #pragma once
 
-// Contains information that represents a move
-struct Move{
-    int start;
-    int end;
-    int move_type;
-    int capture;
-    int color;
-};
+
 
 enum moveType
 {
     quiet,
+    double_pawn_push,
     capture,
-    en_passant,
+    ep_capture,
     castle
 };
 
@@ -58,6 +52,11 @@ public:
 
 private:
     Position position;
+    int turn_to_move;
+    int captures;
+    int checkmates;
+    int en_passant_square;
+    bool en_passant_flag;
 
     // Stores precalculated attack tables for various pieces
     U64 pawn_attacks[2][64];    // Moves of pawns depend on their color so we need two sides.
@@ -100,17 +99,25 @@ private:
     // Gets a specific ray attack on a square in a direction (does not penetrate other pieces)
     U64 GetDirRayAttacks(enumDirections direction, int square);
 
-    std::vector<Move> GenerateMoveList(int color);
+    std::vector<Move> GenerateMoveList();
 
     int GetPieceType(int index);
 
-    void GeneratePawnMoves(int color, std::vector<Move>  &move_list);
-    void GenerateKnightMoves(int color, std::vector<Move> &move_list);
-    void GenerateKingMoves(int color, std::vector<Move> &move_list);
-    void GenerateSliderMoves(int color, std::vector<Move> &move_list);
+    void GeneratePawnMoves(std::vector<Move>  &move_list);
+    void GenerateKnightMoves(std::vector<Move> &move_list);
+    void GenerateKingMoves(std::vector<Move> &move_list);
+    void GenerateSliderMoves(std::vector<Move> &move_list);
 
-    void FillMoveList(std::vector<int> piece_indices, U64 attack_map[64], int color, std::vector<Move> &move_list);
+    void FillMoveList(std::vector<int> piece_indices, U64 attack_map[64], std::vector<Move> &move_list);
 
     void MakeMove(Move move);
     void UnMakeMove(Move move);
+
+    bool KingInCheck(int color);
+
+    int perft(int depth);
+
+    void perft_test(int depth);
+
+    void ToggleMove();
 };

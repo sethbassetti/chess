@@ -5,6 +5,7 @@
 #include <strings.h>
 #include <string.h>
 #include <assert.h>  
+#include <ctime>
 #include <vector>
 #include "utils.h"
 #include "board.h"
@@ -21,41 +22,32 @@ Board::Board(){
     // Constructs a position object that holds information about piece positions
     position = Position();
 
+    // Sets white as the first turn
+    turn_to_move = white;
+
+    // Sets en passant flag to false
+    en_passant_flag = false;
+
     // Initializes leaper attack tables, since they are independent of board position
     InitLeaperAttacks();
 }
 
-
-
-
 /* Test function for implementing and development */
 void Board::Test(){
-    U64 test_board = 0ULL;
 
-    for (int rank = 0; rank < 8; rank++)
+    
+/*
+    char file_array[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+    for (int rank = 1; rank <= 8; rank++)
+        
     {
         for (int file = 0; file < 8; file++)
         {
-            int square = rank * 8 + file;
-            if(rank == file && rank <7){
-                set_bit(test_board, square);
-            }
+            printf("\"%c%d\",", file_array[file], rank);
         }
-    }
-
-
-    vector<Move> moves = GenerateMoveList(white);
-    printf("Num Moves: %ld\n", moves.size());
-    for(Move move : moves){
-        printf("%d\n", move.start);
-    }
-    Move blackPawn = {e7, e5, quiet, blank, black};
-    Move capture_move = {f3, e5, capture, black_pawn, white};
-    MakeMove(moves[18]);
-    MakeMove(blackPawn);
-    MakeMove(capture_move);
-    PrintBoard(position.colors[black]);
-    PrintBoard(position.occupancy);
+        printf("\n");
+    }*/
+    perft_test(5);
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -383,27 +375,19 @@ void Board::InitSliderAttacks(){
 
 /* Given a color and reference to a move list, populates the move list
 with all pawn moves of the given color */
-void Board::GeneratePawnMoves(int color, vector<Move> &moves){
+void Board::GeneratePawnMoves(vector<Move> &moves){
 
-    /* generic variables for bitboards that are set to either white or black respectively */
-    U64 pawns;
-    U64 enemy_pieces;
-    int color_flag;
+    // Offset changes the pawn bitboards from black or white (since they are 6 spots apart in the array)
+    int offset = turn_to_move * 6;
 
-    // If white, pawns are white pawns, enemy is black pieces and color flag is 1 (for pushes later)
-    if(!color){
-        pawns = position.pieces[white_pawn];
-        enemy_pieces =  position.colors[black];
-        color_flag = 1;
-    }
-    // Otherwise, reverse the above
-    else
-    {
-        pawns = position.pieces[black_pawn];
-        enemy_pieces = position.colors[white];
-        color_flag = -1;
-    }
+    // Ends up being -1 for black, 1 for white
+    int color_flag = (turn_to_move - (turn_to_move ^ 1)) * -1;
+
+    // Selects pawn 
+    U64 pawns = position.pieces[white_pawn + offset];
+    U64 enemy_pieces = position.colors[turn_to_move ^ 1];
     
+
     // Serialize the pawns into a vector of their integer indices
     vector<int> pawn_indices = SerializeBitboard(pawns);
 
@@ -411,18 +395,27 @@ void Board::GeneratePawnMoves(int color, vector<Move> &moves){
     for(int pawn : pawn_indices){
 
         // Iterates through each posible attack the pawn could make 
-        vector<int> attack_indices = SerializeBitboard(pawn_attacks[color][pawn]);
+        vector<int> attack_indices = SerializeBitboard(pawn_attacks[turn_to_move][pawn]);
 
         // Iterates through the attacks, adding moves to the move list
         for(int target : attack_indices){
             // If the bit is set on enemy pieces, this is a capture
             if(get_bit(enemy_pieces, target)){
                 // Retrieve which type of piece is being captured
-                int captured_piece = GetPieceType(target);
-                struct Move move = {pawn, target, capture, captured_piece, color};
+                int captured_piece = position.GetPieceType(target);
+                struct Move move = {pawn, target, capture, captured_piece};
                 moves.push_back(move);
-            }
+
+            }/*g
+            if(en_passant_flag && (target == en_passant_square)){
+                printf("Hello\n");
+                int offset = (turn_to_move == white) ? -8 : 8;
+                int captured_piece = position.GetPieceType(target + offset);
+                struct Move move = {pawn, target, ep_capture, captured_piece, color};
+                moves.push_back(move);
+            }*/
         }
+
     }
         
 
@@ -430,7 +423,7 @@ void Board::GeneratePawnMoves(int color, vector<Move> &moves){
     CalcPawnPushes();
 
     // Gets single pawn pushes
-    vector<int> single_pawn_push_indices = SerializeBitboard(single_pawn_pushes[color]);
+    vector<int> single_pawn_push_indices = SerializeBitboard(single_pawn_pushes[turn_to_move]);
     
     // Iterates through every target within the pawn push table
     for(int target : single_pawn_push_indices){
@@ -438,18 +431,20 @@ void Board::GeneratePawnMoves(int color, vector<Move> &moves){
         // Subtract(for white), or adds (for black) 8 to get the rank either directly above or directly
         // below the target. This is because for a single pawn push, the origin will always be the previous rank
         int start = target - 8 * color_flag;
-        struct Move move = {start, target, quiet, blank, color};
+        struct Move move = {start, target, quiet, blank};
         moves.push_back(move);
     }
     // Gets double pawn push moves
-    vector<int> double_pawn_push_indices = SerializeBitboard(double_pawn_pushes[color]);
+    vector<int> double_pawn_push_indices = SerializeBitboard(double_pawn_pushes[turn_to_move]);
     for(int target : double_pawn_push_indices){
         // Either subtracts or adds 16 to get the origin square two ranks above or below the target
         // square
         int start = target - 16 * color_flag;
-        struct Move move = {start, target, en_passant, blank, color};
+        struct Move move = {start, target, double_pawn_push, blank};
         moves.push_back(move);
     }
+
+    
 }
 
 void Board::CalcPawnPushes(){
@@ -468,115 +463,232 @@ void Board::CalcPawnPushes(){
 }
 
 
-void Board::GenerateKnightMoves(int color, vector<Move> &move_list){
-    U64 knights = (!color) ? position.pieces[white_knight] : position.pieces[black_knight];
+void Board::GenerateKnightMoves(vector<Move> &move_list){
+
+    int offset = turn_to_move * 6;
+    U64 knights = position.pieces[white_knight + offset];
 
     vector<int> knight_indices = SerializeBitboard(knights);
-    FillMoveList(knight_indices, knight_attacks, color, move_list);
+    FillMoveList(knight_indices, knight_attacks, move_list);
 }
 
-void Board::GenerateKingMoves(int color, vector<Move> &move_list){
-    U64 king = (!color) ? position.pieces[white_king] : position.pieces[black_king];
+void Board::GenerateKingMoves(vector<Move> &move_list){
+
+    int offset = turn_to_move * 6;
+    U64 king = position.pieces[white_king + offset];
 
     vector<int> king_indices = SerializeBitboard(king);
-    FillMoveList(king_indices, king_attacks, color, move_list);
+    FillMoveList(king_indices, king_attacks, move_list);
 }
 
-void Board::GenerateSliderMoves(int color, vector<Move> &move_list){
-    U64 queens = position.pieces[black_queen];
-    U64 rooks = position.pieces[black_rook];
-    U64 bishops = position.pieces[black_bishop];
+void Board::GenerateSliderMoves(vector<Move> &move_list){
 
-    if(!color){
-        queens = position.pieces[white_queen];
-        rooks = position.pieces[white_rook];
-        bishops = position.pieces[white_bishop];
-    }
+    int offset = turn_to_move * 6;
+
+    U64 queens = position.pieces[white_queen + offset];
+    U64 rooks = position.pieces[white_rook + offset];
+    U64 bishops = position.pieces[white_bishop + offset];
 
     vector<int> queen_index = SerializeBitboard(queens);
     vector<int> rook_index = SerializeBitboard(rooks);
     vector<int> bishop_index = SerializeBitboard(bishops);
     InitSliderAttacks();
 
-    FillMoveList(queen_index, queen_attacks, color, move_list);
-    FillMoveList(rook_index, rook_attacks, color, move_list);
-    FillMoveList(bishop_index, bishop_attacks, color,  move_list);
+    FillMoveList(queen_index, queen_attacks, move_list);
+    FillMoveList(rook_index, rook_attacks, move_list);
+    FillMoveList(bishop_index, bishop_attacks,  move_list);
 }
 
-void Board::FillMoveList(vector<int> piece_list, U64 attack_map[64], int color, vector<Move> &move_list){
-    U64 color_pieces = position.colors[black];
-    if (!color)
-    {
-        color_pieces = position.colors[white];
-    }
+void Board::FillMoveList(vector<int> piece_list, U64 attack_map[64], vector<Move> &move_list){
 
-    for(int piece : piece_list){
+    U64 color_pieces = position.colors[turn_to_move];
+    for (int piece : piece_list)
+    {
         vector<int> targets = SerializeBitboard(attack_map[piece] & ~color_pieces);
         for(int target : targets){
-            Move move;
-            move.start = piece;
-            move.end = target;
-            move.capture = GetPieceType(target);
-            move.move_type = (move.capture) ? capture : quiet;
-            move.color = color;
+            Move move = {piece, target, quiet, position.GetPieceType(target)};
             move_list.push_back(move);
         }
     }
 }
-vector<Move> Board::GenerateMoveList(int color){
+vector<Move> Board::GenerateMoveList(){
 
     vector<U64> piece_bitboards;
     vector<Move> move_list;
 
     // Adds all pawn moves for the color to the move list
-    GeneratePawnMoves(color, move_list);
+    GeneratePawnMoves(move_list);
 
     // Adds all knight moves for the color to the move list
-    GenerateKnightMoves(color, move_list);
+    GenerateKnightMoves(move_list);
 
     // Adds all king moves for the color to the move list
-    GenerateKingMoves(color, move_list);
+    GenerateKingMoves(move_list);
 
-    GenerateSliderMoves(color, move_list);
+    GenerateSliderMoves(move_list);
 
     return move_list;
 }
 
-int Board::GetPieceType(int index){
 
-    for (int i = 0; i < 13; i++){
-        if(get_bit(position.pieces[i], index)){
-            return i;
-        }
-    }
-    return 0;
-}
 
 void Board::MakeMove(Move move){
 
+
     // Gets the type of piece being moves to update it's bitboard
-    int moving_piece_type = GetPieceType(move.start);
-    int captured_piece_type = GetPieceType(move.end);
-    int enemy_color = (move.color == white) ? black : white;
+    int moving_piece_type = position.GetPieceType(move.start);
+
+    int enemy_color = turn_to_move ^ 1;
 
     // Pop the bit from both its piece bitboard and color bitboard
-    pop_bit(position.colors[move.color], move.start);
+    pop_bit(position.colors[turn_to_move], move.start);
     pop_bit(position.pieces[moving_piece_type], move.start);
 
     // If the captured piece type is not 0 (indicating a blank) remove it from its respective bitboards
-    if(captured_piece_type){
-        pop_bit(position.pieces[captured_piece_type], move.end);
+    if(move.capture && (move.move_type != ep_capture)){
+        pop_bit(position.pieces[move.capture], move.end);
         pop_bit(position.colors[enemy_color], move.end);
+    }else if(move.move_type == ep_capture){
+        
+        int offset = (turn_to_move == white) ? -8 : 8;
+        pop_bit(position.pieces[move.capture], (move.end + offset));
+        pop_bit(position.colors[enemy_color], (move.end + offset));
     }
 
     // Sets the moving piece bit from both its piece and color bitboard
-    set_bit(position.colors[move.color], move.end);
+    set_bit(position.colors[turn_to_move], move.end);
     set_bit(position.pieces[moving_piece_type], move.end);
+
+    if(move.move_type == double_pawn_push){
+        en_passant_square = (move.start + move.end) / 2;
+        en_passant_flag = true;
+    }else{
+        en_passant_flag = false;
+    }
     position.ResetOccupancy();
+    InitSliderAttacks();
+    ToggleMove();
+
 }
 
-    void Board::UnMakeMove(Move move)
+void Board::UnMakeMove(Move move)
+{
+    int piece_color = turn_to_move ^ 1;
+    int enemy_color = turn_to_move;
+
+    // Gets the type of piece being moves to update it's bitboard
+    int moving_piece_type = position.GetPieceType(move.end);
+
+    // Resets the piece to its starting position on piece and color bitboards
+    set_bit(position.pieces[moving_piece_type], move.start);
+    set_bit(position.colors[piece_color], move.start);
+
+    // Removes the piece from its end position on piece and color bitboards
+    pop_bit(position.pieces[moving_piece_type], move.end);
+    pop_bit(position.colors[piece_color], move.end);
+
+    if(move.capture){
+        set_bit(position.pieces[move.capture], move.end);
+        set_bit(position.colors[enemy_color], move.end);
+    }
+    ToggleMove();
+}
+
+bool Board::KingInCheck(int color){
+
+    int offset = 6 * color;
+    int enemy_offset = 6 * (color ^ 1);
+
+    U64 king = position.pieces[white_king + offset];
+    int king_square = SerializeBitboard(king).at(0);
+
+    // Retrieves the bitboard of enemy pawns opposite the kings color
+    U64 enemy_pawns = position.pieces[white_pawn + enemy_offset];
+    // 
+    if(pawn_attacks[color][king_square] & enemy_pawns){
+        return true;
+    }
+
+    U64 enemy_knights = position.pieces[white_knight + enemy_offset];
+    if(knight_attacks[king_square] & enemy_knights){
+        return true;
+    }
+
+    U64 enemy_king = position.pieces[white_king + enemy_offset];
+    if(king_attacks[king_square] & enemy_king){
+        return true;
+    }
+
+    U64 enemy_rooks = position.pieces[white_rook + enemy_offset];
+    if(rook_attacks[king_square] & enemy_rooks){
+        return true;
+    }
+
+    U64 enemy_bishops = position.pieces[white_bishop + enemy_offset];
+    if(bishop_attacks[king_square] & enemy_bishops){
+        return true;
+    }
+
+    U64 enemy_queens = position.pieces[white_queen + enemy_offset];
+    if(bishop_attacks[king_square] & enemy_queens){
+        return true;
+    }
+
+    return false;
+}
+
+int Board::perft(int depth){
+    int nodes = 0;
+
+    if (depth == 0)
     {
+        return 1;
+    }
 
+    vector<Move> moves = GenerateMoveList();
+    for (Move move : moves)
+    {
+        MakeMove(move);
+        
+        if(!KingInCheck(turn_to_move ^ 1)){
+            if(move.move_type == capture && depth==1){
+                captures += 1;
+            }
+            nodes += perft(depth - 1);
+        }
+        
+        UnMakeMove(move);
+    }
 
+    return nodes;
+}
+
+void Board::perft_test(int depth){
+    
+    clock_t start;
+    double duration;
+    start = clock();
+    captures = 0;
+    
+    
+    
+    int total_count = 0;
+    vector<Move> moves = GenerateMoveList();
+    for(Move move : moves){
+        MakeMove(move);
+        int count = perft(depth - 1);
+        total_count += count;
+        UnMakeMove(move);
+        PrintMove(move);
+        printf(": %d\n", count);
+    }
+    duration = (clock() - start) / (double)CLOCKS_PER_SEC;
+    printf("Perft: %d nodes searched\n", total_count);
+    printf("Took %f seconds\n", duration);
+    printf("Number of captures: %d\n", captures);
+    printf("Number of checkmates: %d\n", checkmates);
+}
+
+void Board::ToggleMove(){
+    turn_to_move ^= 1;
 }
