@@ -38,20 +38,31 @@ Board::Board(){
 /* Test function for implementing and development */
 void Board::Test(){
 
-    
-/*
-    char file_array[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
-    for (int rank = 1; rank <= 8; rank++)
+    U64 test = 0ULL;
+    //char file_array[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+    for (int rank = 0; rank < 8; rank++)
         
     {
         for (int file = 0; file < 8; file++)
         {
-            printf("\"%c%d\",", file_array[file], rank);
+            int square = rank * 8 + file;
+            if (rank == 7 || rank == 0)
+            {
+                set_bit(test, square);
+            }
         }
-        printf("\n");
-    }*/
+    }
+    MakeMove(e2, e4);
+    MakeMove(d7, d5);
+    MakeMove(e4, e5);
+    MakeMove(d5, d4);
+    MakeMove(e5, e6);
+    MakeMove(d4, d3);
+    MakeMove(e6, f7);
+    MakeMove(e8, d7);
+    MakeMove(f7, g8);
 
-perft_test(5);
+    position.PrintBoard();
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -406,6 +417,12 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
                 // Retrieve which type of piece is being captured
                 int captured_piece = position.GetPieceType(target);
                 struct Move move = {pawn, target, capture, captured_piece};
+                if(get_bit(first_last_ranks, target)){
+                    move.promo_piece = white_knight;
+                    struct Move secondPromo = move;
+                    secondPromo.promo_piece = white_queen;
+                    moves.push_back(secondPromo);
+                }
                 moves.push_back(move);
 
             }
@@ -433,6 +450,13 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
         // below the target. This is because for a single pawn push, the origin will always be the previous rank
         int start = target - 8 * color_flag;
         struct Move move = {start, target, quiet, blank};
+        
+        if(get_bit(first_last_ranks, target)){
+                    move.promo_piece = white_knight;
+                    struct Move secondPromo = move;
+                    secondPromo.promo_piece = white_queen;
+                    moves.push_back(secondPromo);
+                }
         moves.push_back(move);
     }
     // Gets double pawn push moves
@@ -585,7 +609,11 @@ void Board::MakeMove(Move move){
 
     // Sets the moving piece bit from both its piece and color bitboard
     set_bit(position.colors[turn_to_move], move.end);
-    set_bit(position.pieces[moving_piece_type], move.end);
+    if(!move.promo_piece){
+        set_bit(position.pieces[moving_piece_type], move.end);
+    }else{
+        set_bit(position.pieces[move.promo_piece + turn_to_move * 6], move.end);
+    }
 
     if(move.move_type == double_pawn_push){
         en_passant_square = (move.start + move.end) / 2;
@@ -619,7 +647,12 @@ void Board::UnMakeMove(Move move)
     int moving_piece_type = position.GetPieceType(move.end);
 
     // Resets the piece to its starting position on piece and color bitboards
-    set_bit(position.pieces[moving_piece_type], move.start);
+    if(!move.promo_piece){
+        set_bit(position.pieces[moving_piece_type], move.start);
+    }else{
+        set_bit(position.pieces[white_pawn + piece_color * 6], move.start);
+    }
+
     set_bit(position.colors[piece_color], move.start);
 
     // Removes the piece from its end position on piece and color bitboards

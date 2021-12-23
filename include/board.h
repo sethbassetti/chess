@@ -6,15 +6,7 @@
 
 
 
-enum moveType
-{
-    quiet,
-    double_pawn_push,
-    capture,
-    ep_capture,
-    castle,
-    promotion
-};
+
 
 
 // Enumerates everything on the board so it can be described with numbers or letters

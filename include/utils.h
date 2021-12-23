@@ -10,6 +10,7 @@ const U64 not_a_file = 0xfefefefefefefefeULL;   // All 1's except a file
 const U64 not_h_file = 0x7f7f7f7f7f7f7f7fULL;   // All 1's except h file
 const U64 not_ab_file = 0xfcfcfcfcfcfcfcfcULL;  // All 1's except ab files
 const U64 not_gh_file = 0x3f3f3f3f3f3f3f3fULL;  // All 1's except gh files
+const U64 first_last_ranks = 0xff000000000000ffULL; // 1's on the bottom and top ranks
 
 // Contains information that represents a move
 struct Move{
@@ -17,6 +18,17 @@ struct Move{
     int end;
     int move_type;
     int capture;
+    int promo_piece;
+};
+
+enum moveType
+{
+    quiet,
+    double_pawn_push,
+    capture,
+    ep_capture,
+    castle,
+    promotion
 };
 
 
