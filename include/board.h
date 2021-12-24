@@ -51,6 +51,9 @@ private:
     int en_passant_square;
     bool en_passant_flag;
 
+    // This stores castling rights
+    int castling_rights;
+
     // Stores precalculated attack tables for various pieces
     U64 pawn_attacks[2][64];    // Moves of pawns depend on their color so we need two sides.
     U64 king_attacks[64];
@@ -110,6 +113,7 @@ private:
     void ParseLegalMoves(std::vector<Move> &move_list);
 
     bool KingInCheck(int color);
+    bool IsSquareAttacked(int square, int color);
 
     int perft(int depth);
 

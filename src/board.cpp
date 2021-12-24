@@ -28,6 +28,9 @@ Board::Board(){
     // Sets en passant flag to false
     en_passant_flag = false;
 
+    // Sets castling rights
+    castling_rights = 15;
+
     // Initializes leaper attack tables, since they are independent of board position
     InitLeaperAttacks();
 
@@ -38,31 +41,26 @@ Board::Board(){
 /* Test function for implementing and development */
 void Board::Test(){
 
-    U64 test = 0ULL;
-    //char file_array[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
-    for (int rank = 0; rank < 8; rank++)
-        
-    {
-        for (int file = 0; file < 8; file++)
-        {
-            int square = rank * 8 + file;
-            if (rank == 7 || rank == 0)
-            {
-                set_bit(test, square);
-            }
-        }
-    }
-    MakeMove(e2, e4);
+    MakeMove(e2, e3);
     MakeMove(d7, d5);
-    MakeMove(e4, e5);
+    MakeMove(g1, f3);
+    MakeMove(b8, c6);
+    MakeMove(f1, d3);
     MakeMove(d5, d4);
-    MakeMove(e5, e6);
-    MakeMove(d4, d3);
-    MakeMove(e6, f7);
-    MakeMove(e8, d7);
-    MakeMove(f7, g8);
+    /*
+    vector<Move> moves = GenerateMoveList();
+    for(Move move : moves){
+        if(move.start == e1 && move.end == g1){
+            printf("Move Type: %d\n", move.move_type);
+        }
+    }*/
 
     position.PrintBoard();
+
+    printf("%d\n", castling_rights);
+   // PrintBoard(position.colors[white]);
+
+    perft_test(4);
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -417,10 +415,13 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
                 // Retrieve which type of piece is being captured
                 int captured_piece = position.GetPieceType(target);
                 struct Move move = {pawn, target, capture, captured_piece};
-                if(get_bit(first_last_ranks, target)){
+                move.castling_rights = castling_rights;
+                if (get_bit(first_last_ranks, target))
+                {
                     move.promo_piece = white_knight;
                     struct Move secondPromo = move;
                     secondPromo.promo_piece = white_queen;
+                    secondPromo.castling_rights = castling_rights;
                     moves.push_back(secondPromo);
                 }
                 moves.push_back(move);
@@ -430,6 +431,7 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
                 int offset = (turn_to_move == white) ? -8 : 8;
                 int captured_piece = position.GetPieceType(target + offset);
                 struct Move move = {pawn, target, ep_capture, captured_piece};
+                move.castling_rights = castling_rights;
                 moves.push_back(move);
             }
         }
@@ -450,10 +452,12 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
         // below the target. This is because for a single pawn push, the origin will always be the previous rank
         int start = target - 8 * color_flag;
         struct Move move = {start, target, quiet, blank};
+        move.castling_rights = castling_rights;
         
         if(get_bit(first_last_ranks, target)){
                     move.promo_piece = white_knight;
                     struct Move secondPromo = move;
+                    secondPromo.castling_rights = castling_rights;
                     secondPromo.promo_piece = white_queen;
                     moves.push_back(secondPromo);
                 }
@@ -466,6 +470,7 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
         // square
         int start = target - 16 * color_flag;
         struct Move move = {start, target, double_pawn_push, blank};
+        move.castling_rights = castling_rights;
         moves.push_back(move);
     }
 
@@ -504,6 +509,41 @@ void Board::GenerateKingMoves(vector<Move> &move_list){
 
     vector<int> king_indices = SerializeBitboard(king);
     FillMoveList(king_indices, king_attacks, move_list);
+
+    
+    // Generate castling moves for white
+    if(!turn_to_move){
+        // Kingside castling rights
+        if(castling_rights & wk){
+            if(!(wk_castle_occupancy & position.occupancy)){
+                Move castle_move = {king_indices.at(0), g1, castle, 0, 0, castling_rights};
+                move_list.push_back(castle_move);
+            }
+        }
+        // Queenside castling rights
+        if(castling_rights & wq){
+            if(!(wq_castle_occupancy & position.occupancy)){
+                Move castle_move = {king_indices.at(0), c1, castle, 0, 0, castling_rights};
+                move_list.push_back(castle_move);
+            }
+        }
+    }else{
+        // Kingside castling rights
+        if(castling_rights & bk){
+            if(!(bk_castle_occupancy & position.occupancy)){
+                Move castle_move = {king_indices.at(0), g8, castle, 0, 0, castling_rights};
+                move_list.push_back(castle_move);
+            }
+        }
+        // Queenside castling rights
+        if(castling_rights & bq){
+            if(!(bq_castle_occupancy & position.occupancy)){
+                Move castle_move = {king_indices.at(0), c8, castle, 0, 0, castling_rights};
+                move_list.push_back(castle_move);
+            }
+        }
+    }
+    
 }
 
 void Board::GenerateSliderMoves(vector<Move> &move_list){
@@ -533,7 +573,9 @@ void Board::FillMoveList(vector<int> piece_list, U64 attack_map[64], vector<Move
         for(int target : targets){
             int captured_piece = position.GetPieceType(target);
             Move move = {piece, target, quiet, captured_piece};
-            if(captured_piece){
+            move.castling_rights = castling_rights;
+            if (captured_piece)
+            {
                 move.move_type = capture;
             }
 
@@ -567,6 +609,13 @@ void Board::ParseLegalMoves(vector<Move> &move_list){
     auto current_move = move_list.begin();
     while (current_move != move_list.end()){
         Move move = *current_move;
+        // Checks to see if any of the squares the king passes through are being attacked
+        if(move.move_type == castle){
+            if(IsSquareAttacked(move.start, turn_to_move) || IsSquareAttacked(move.end, turn_to_move) || IsSquareAttacked((move.start + move.end)/2, turn_to_move)){
+                current_move = move_list.erase(current_move);
+                continue;
+            }
+        }
         MakeMove(move);
         if(!KingInCheck(turn_to_move ^ 1)){
             current_move++;
@@ -621,10 +670,54 @@ void Board::MakeMove(Move move){
     }else{
         en_passant_flag = false;
     }
+    // Reset castling rights
+
+    if(move.move_type == castle){
+        if(move.end == g1){
+            MoveBit(position.pieces[white_rook], h1, f1);
+            MoveBit(position.colors[white], h1, f1);
+            castling_rights -= 3;
+        }
+        else if (move.end == c1)
+        {
+            MoveBit(position.pieces[white_rook], a1, d1);
+            MoveBit(position.colors[white], a1, d1);
+            castling_rights -= 3;
+        }
+        else if (move.end == c8)
+        {
+            MoveBit(position.pieces[black_rook], a8, d8);
+            MoveBit(position.colors[black], a8, d8);
+            castling_rights -= 12;
+        }
+        else if(move.end == g8){
+            MoveBit(position.pieces[black_rook], h8, f8);
+            MoveBit(position.colors[black], h8, f8);
+            castling_rights -= 12;
+        }
+    }
+    if(moving_piece_type == white_king){
+        castling_rights &= 12;
+    }
+    else if (moving_piece_type == black_king)
+    {
+        castling_rights &= 3;
+    }else if(moving_piece_type == white_rook){
+        // Take away queenside castle flag
+        if(move.start == a1){
+            castling_rights &= 15 - wq;
+        }else if(move.start == h1){
+            castling_rights &= 15 - wk;
+        }
+    }else if(moving_piece_type == black_rook){
+        if(move.start == a8){
+            castling_rights &= 15 - bq;
+        }else if(move.start == h8){
+            castling_rights &= 15 - bk;
+        }
+    }
     position.ResetOccupancy();
-
     ToggleMove();
-
 }
 
 void Board::MakeMove(int start, int end){
@@ -667,46 +760,77 @@ void Board::UnMakeMove(Move move)
         set_bit(position.pieces[move.capture], (move.end + offset));
         set_bit(position.colors[enemy_color], (move.end + offset));
     }
+
+    if(move.move_type == castle){
+        if(move.end == g1){
+            MoveBit(position.pieces[white_rook], f1, h1);
+            MoveBit(position.colors[white], f1, h1);
+            castling_rights += 3;
+        }
+        else if (move.end == c1)
+        {
+            MoveBit(position.pieces[white_rook], d1, a1);
+            MoveBit(position.colors[white], d1, a1);
+            castling_rights += 3;
+        }
+        else if (move.end == c8)
+        {
+            MoveBit(position.pieces[black_rook], d8, a8);
+            MoveBit(position.colors[black], d8, a8);
+            castling_rights += 12;
+        }
+        else if(move.end == g8){
+            MoveBit(position.pieces[black_rook], f8, h8);
+            MoveBit(position.colors[black], f8, h8);
+            castling_rights += 12;
+        }
+    }
+    castling_rights = move.castling_rights;
     ToggleMove();
 }
 
 bool Board::KingInCheck(int color){
-    InitSliderAttacks();
+    
     int offset = 6 * color;
-    int enemy_offset = 6 * (color ^ 1);
-
     U64 king = position.pieces[white_king + offset];
     int king_square = SerializeBitboard(king).at(0);
+    return IsSquareAttacked(king_square, color);
+}
+
+bool Board::IsSquareAttacked(int square, int color){
+
+    InitSliderAttacks();
+    int enemy_offset = 6 * (color ^ 1);
 
     // Retrieves the bitboard of enemy pawns opposite the kings color
     U64 enemy_pawns = position.pieces[white_pawn + enemy_offset];
     // 
-    if(pawn_attacks[color][king_square] & enemy_pawns){
+    if(pawn_attacks[color][square] & enemy_pawns){
         return true;
     }
 
     U64 enemy_knights = position.pieces[white_knight + enemy_offset];
-    if(knight_attacks[king_square] & enemy_knights){
+    if(knight_attacks[square] & enemy_knights){
         return true;
     }
 
     U64 enemy_king = position.pieces[white_king + enemy_offset];
-    if(king_attacks[king_square] & enemy_king){
+    if(king_attacks[square] & enemy_king){
         return true;
     }
 
     U64 enemy_rooks = position.pieces[white_rook + enemy_offset];
-    if(rook_attacks[king_square] & enemy_rooks){
+    if(rook_attacks[square] & enemy_rooks){
         return true;
     }
 
     U64 enemy_bishops = position.pieces[white_bishop + enemy_offset];
-    if(bishop_attacks[king_square] & enemy_bishops){
+    if(bishop_attacks[square] & enemy_bishops){
         return true;
     }
 
     U64 enemy_queens = position.pieces[white_queen + enemy_offset];
-    if(queen_attacks[king_square] & enemy_queens){
+    if(queen_attacks[square] & enemy_queens){
         return true;
     }
 

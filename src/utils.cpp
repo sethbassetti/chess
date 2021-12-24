@@ -88,3 +88,8 @@ void PrintMove(Move move){
     string end = square_index[move.end];
     cout << start << end;
 }
+
+void MoveBit(U64 &bitboard, int start, int end){
+    pop_bit(bitboard, start);
+    set_bit(bitboard, end);
+}

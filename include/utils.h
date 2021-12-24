@@ -11,6 +11,10 @@ const U64 not_h_file = 0x7f7f7f7f7f7f7f7fULL;   // All 1's except h file
 const U64 not_ab_file = 0xfcfcfcfcfcfcfcfcULL;  // All 1's except ab files
 const U64 not_gh_file = 0x3f3f3f3f3f3f3f3fULL;  // All 1's except gh files
 const U64 first_last_ranks = 0xff000000000000ffULL; // 1's on the bottom and top ranks
+const U64 wk_castle_occupancy = 0x60ULL; // Squares set in between white rook and king
+const U64 wq_castle_occupancy = 0xcULL; // Squares set in between white rook and king for queenside castle
+const U64 bk_castle_occupancy = 0x6000000000000000ULL; // Squares set in between black rook and king/kingside castle
+const U64 bq_castle_occupancy = 0xc00000000000000ULL; // Squares set in between black rook and king for queenside castle
 
 // Contains information that represents a move
 struct Move{
@@ -19,6 +23,7 @@ struct Move{
     int move_type;
     int capture;
     int promo_piece;
+    int castling_rights;
 };
 
 enum moveType
@@ -31,7 +36,14 @@ enum moveType
     promotion
 };
 
-
+// These are castle bits
+enum
+{
+    wk = 1,
+    wq = 2,
+    bk = 4,
+    bq = 8
+};
 
 // White is 0, black is 1
 enum Color{white, black};
@@ -76,3 +88,6 @@ std::vector<int> SerializeBitboard(U64 Bitboard);
 void PrintBoard(U64 bitboard);
 
 void PrintMove(struct Move move);
+
+void MoveBit(U64 &bitboard, int start, int end);
+
