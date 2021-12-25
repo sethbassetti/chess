@@ -20,7 +20,7 @@ public:
 
     bool en_passant;
 
-    void ResetOccupancy();
+    void Update();
 
     int GetPieceType(int index);
 

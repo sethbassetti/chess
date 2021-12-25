@@ -12,9 +12,9 @@ const U64 not_ab_file = 0xfcfcfcfcfcfcfcfcULL;  // All 1's except ab files
 const U64 not_gh_file = 0x3f3f3f3f3f3f3f3fULL;  // All 1's except gh files
 const U64 first_last_ranks = 0xff000000000000ffULL; // 1's on the bottom and top ranks
 const U64 wk_castle_occupancy = 0x60ULL; // Squares set in between white rook and king
-const U64 wq_castle_occupancy = 0xcULL; // Squares set in between white rook and king for queenside castle
+const U64 wq_castle_occupancy = 0xeULL;  // Squares set in between white rook and king for queenside castle
 const U64 bk_castle_occupancy = 0x6000000000000000ULL; // Squares set in between black rook and king/kingside castle
-const U64 bq_castle_occupancy = 0xc00000000000000ULL; // Squares set in between black rook and king for queenside castle
+const U64 bq_castle_occupancy = 0xe00000000000000ULL; // Squares set in between black rook and king for queenside castle
 
 // Contains information that represents a move
 struct Move{
@@ -79,7 +79,7 @@ enum pieceType
 #define is_negative(dir)(dir > 3)
 
 // Helper functions that perform bitscans either forward or reverse
-int BitScan(U64 bitboard, bool reverse);
+int BitScan(U64 bitboard, bool reverse=false);
 
 // Returns a vector of every index in the bitboard that is set to 1
 std::vector<int> SerializeBitboard(U64 Bitboard);

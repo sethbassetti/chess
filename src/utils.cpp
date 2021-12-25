@@ -19,7 +19,7 @@ string square_index[64] = {"a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
 
 /* Helper function used to find either the least significant bit (rightmost) or the most significant bit
 (leftmost) of a bitboard. bitscan reverse is used to find the MSB */
-int BitScan(U64 bitboard, bool reverse=false){
+int BitScan(U64 bitboard, bool reverse){
 
     // If reverse is not true, do a forward bitscan with ffs() function. Subtract 1 to get 0 based index.
     if(!reverse){
@@ -31,6 +31,7 @@ int BitScan(U64 bitboard, bool reverse=false){
         return 63 - __builtin_clzll(bitboard);
     }
 }
+
 /* Serializes the bitboard by finding all indices where the bit is set to 1 */
 vector<int> SerializeBitboard(U64 bb){
 

@@ -44,12 +44,11 @@ public:
     void Test();
 
 private:
-    Position position;
-    int turn_to_move;
-    int captures;
-    int checkmates;
-    int en_passant_square;
-    bool en_passant_flag;
+    // Board state variables
+    Position position;      // Holds the position of all pieces on the board
+    int turn_to_move;       // Holds the color of whose turn it is
+    int en_passant_square;  // Holds the square that a piece can make an en passant move to, if 0 then no en passant
+    bool test_flag;
 
     // This stores castling rights
     int castling_rights;
@@ -110,7 +109,7 @@ private:
     void MakeMove(int start, int end);
     void UnMakeMove(Move move);
 
-    void ParseLegalMoves(std::vector<Move> &move_list);
+    std::vector<Move> ParseLegalMoves(std::vector<Move> move_list);
 
     bool KingInCheck(int color);
     bool IsSquareAttacked(int square, int color);

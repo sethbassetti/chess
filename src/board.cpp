@@ -11,25 +11,22 @@
 #include "board.h"
 #include "position.h"
 
-
 using namespace std;
-
-
 
 // Constructor for board, initializes board position and preset attack tables
 Board::Board(){
     
-    // Constructs a position object that holds information about piece positions
+    // Constructs a position object that holds information about piece positions, sets up initial board position
     position = Position();
 
     // Sets white as the first turn
     turn_to_move = white;
 
-    // Sets en passant flag to false
-    en_passant_flag = false;
+    // Set en passant square to 0 (indicates no en passant available)
+    en_passant_square = 0;
 
-    // Sets castling rights
-    castling_rights = 15;
+    // Sets castling rights such that all castling is available at the start (no pieces have moved)
+    castling_rights = wk | wq | bk | bq;
 
     // Initializes leaper attack tables, since they are independent of board position
     InitLeaperAttacks();
@@ -40,26 +37,17 @@ Board::Board(){
 
 /* Test function for implementing and development */
 void Board::Test(){
-
-    MakeMove(e2, e3);
+    MakeMove(e2, e4);
     MakeMove(d7, d5);
-    MakeMove(g1, f3);
-    MakeMove(b8, c6);
-    MakeMove(f1, d3);
+    MakeMove(e4, e5);
     MakeMove(d5, d4);
-    /*
-    vector<Move> moves = GenerateMoveList();
-    for(Move move : moves){
-        if(move.start == e1 && move.end == g1){
-            printf("Move Type: %d\n", move.move_type);
-        }
-    }*/
-
+    MakeMove(f1, c4);
+    MakeMove(b8, a6);
+    MakeMove(g1, f3);
+    MakeMove(d8, d5);
+    MakeMove(g2, g4);
+    MakeMove(c7, c5);
     position.PrintBoard();
-
-    printf("%d\n", castling_rights);
-   // PrintBoard(position.colors[white]);
-
     perft_test(4);
 }
 
@@ -174,95 +162,6 @@ void Board::InitLeaperAttacks(){
     }
 }
 
-/* Calculates sliding attack sets for rooks given square parameter */
-U64 Board::CalcRookAttacks(int square){
-    // Stores the attacks
-    U64 attacks = 0ULL;
-
-    // Stores the piece on the square
-    U64 bitboard = 0ULL;
-
-    // set piece on board
-    set_bit(bitboard, square);
-
-    // Creates a vector of the rays to construct the attacks from
-    enumDirections dirs[4] = {Nort, East, West, Sout};
-
-    // Iterates over every direction to construct attack table
-    for (int i = 0; i < 4; i++){
-        
-        // Assigns the current direction to dir
-        enumDirections dir = dirs[i];
-        
-        // Gets the appropriate ray attack for the direction and square
-        U64 ray_attack = GetDirRayAttacks(dir, square);
-
-        // Adds the ray attack to the overall attacks table with a union
-        attacks |= ray_attack;
-    }
-
-    return attacks;
-}
-
-U64 Board::CalcBishopAttacks(int square){
-    // Stores the attacks
-    U64 attacks = 0ULL;
-
-    // Stores the piece on the square
-    U64 bitboard = 0ULL;
-
-    // set piece on board
-    set_bit(bitboard, square);
-
-    // Creates a vector of the rays to construct the attacks from
-    enumDirections dirs[4] = {NoWe, SoWe, SoEa, NoEa};
-
-    // Iterates over every direction to construct attack table
-    for (int i = 0; i < 4; i++){
-        
-        // Assigns the current direction to dir
-        enumDirections dir = dirs[i];
-        
-        // Gets the appropriate ray attack for the direction and square
-        U64 ray_attack = GetDirRayAttacks(dir, square);
-
-        // Adds the ray attack to the overall attacks table with a union
-        attacks |= ray_attack;
-    }
-
-    return attacks;
-}
-
-/* Unions the rook and bishop attacks to form queen attack table. NOTE: This function HAS to be called after
-the rook and bishop attack tables are built or it will construct the empty set */
-U64 Board::CalcQueenAttacks(int square){
-    return rook_attacks[square] | bishop_attacks[square];
-}
-/* Returns the ray attack in a given direction (N, NW, S, SE, etc...) from the given square.
-This function considers blocker pieces. Thus, the ray attacks only go as far as line of sight from the
-square allows */
-U64 Board::GetDirRayAttacks(enumDirections dir, int square){
-
-    // Retrieves ray attacks from lookup table
-    U64 ray_attack = ray_attacks[square][dir];
-
-    // Calculates every piece that ray can hit with intersection of ray attack and occupancy    
-    U64 blocker = ray_attack & position.occupancy;
-
-    // If there is a blocker, make sure ray attack cannot go through that square
-    if(blocker){
-        // Gets the index of the first piece the ray attack would hit
-        int index = BitScan(blocker, is_negative(dir));
-
-        // Does an XOR to calculate the ray attack UP TO the first piece it hits and no further. 
-        // This works by looking up what the ray would be at the first blocker and then simply XORing
-        // to get the original ray minus the ray from the blocker square
-        ray_attack ^= ray_attacks[index][dir];
-    }
-
-    return ray_attack;
-}
-
 /* Initialize Ray Attack table. Constructs north, south, east, and west ray attacks (occupancy agnostic)
 for every square on the board */
 void Board::InitRayAttacks(){
@@ -367,6 +266,97 @@ void Board::InitRayAttacks(){
     }
 }
 
+/* Calculates sliding attack sets for rooks given square parameter */
+U64 Board::CalcRookAttacks(int square){
+    // Stores the attacks
+    U64 attacks = 0ULL;
+
+    // Stores the piece on the square
+    U64 bitboard = 0ULL;
+
+    // set piece on board
+    set_bit(bitboard, square);
+
+    // Creates a vector of the rays to construct the attacks from
+    enumDirections dirs[4] = {Nort, East, West, Sout};
+
+    // Iterates over every direction to construct attack table
+    for (int i = 0; i < 4; i++){
+        
+        // Assigns the current direction to dir
+        enumDirections dir = dirs[i];
+        
+        // Gets the appropriate ray attack for the direction and square
+        U64 ray_attack = GetDirRayAttacks(dir, square);
+
+        // Adds the ray attack to the overall attacks table with a union
+        attacks |= ray_attack;
+    }
+
+    return attacks;
+}
+
+U64 Board::CalcBishopAttacks(int square){
+    // Stores the attacks
+    U64 attacks = 0ULL;
+
+    // Stores the piece on the square
+    U64 bitboard = 0ULL;
+
+    // set piece on board
+    set_bit(bitboard, square);
+
+    // Creates a vector of the rays to construct the attacks from
+    enumDirections dirs[4] = {NoWe, SoWe, SoEa, NoEa};
+
+    // Iterates over every direction to construct attack table
+    for (int i = 0; i < 4; i++){
+        
+        // Assigns the current direction to dir
+        enumDirections dir = dirs[i];
+        
+        // Gets the appropriate ray attack for the direction and square
+        U64 ray_attack = GetDirRayAttacks(dir, square);
+   
+        // Adds the ray attack to the overall attacks table with a union
+        attacks |= ray_attack;
+    }
+
+    return attacks;
+}
+
+/* Unions the rook and bishop attacks to form queen attack table. NOTE: This function HAS to be called after
+the rook and bishop attack tables are built or it will construct the empty set */
+U64 Board::CalcQueenAttacks(int square){
+    return rook_attacks[square] | bishop_attacks[square];
+}
+/* Returns the ray attack in a given direction (N, NW, S, SE, etc...) from the given square.
+This function considers blocker pieces. Thus, the ray attacks only go as far as line of sight from the
+square allows */
+U64 Board::GetDirRayAttacks(enumDirections dir, int square){
+
+    // Retrieves ray attacks from lookup table
+    U64 ray_attack = ray_attacks[square][dir];
+
+    // Calculates every piece that ray can hit with intersection of ray attack and occupancy    
+    U64 blocker = ray_attack & position.occupancy;
+
+    // If there is a blocker, make sure ray attack cannot go through that square
+    if(blocker){
+        // Gets the index of the first piece the ray attack would hit
+        int index = BitScan(blocker, is_negative(dir));
+
+        // Does an XOR to calculate the ray attack UP TO the first piece it hits and no further. 
+        // This works by looking up what the ray would be at the first blocker and then simply XORing
+        // to get the original ray minus the ray from the blocker square
+        ray_attack ^= ray_attacks[index][dir];
+    }
+
+    return ray_attack;
+}
+
+
+
 /* Retrieves attack tables for slider pieces (bishop, rook, queen) */
 void Board::InitSliderAttacks(){
 
@@ -422,12 +412,18 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
                     struct Move secondPromo = move;
                     secondPromo.promo_piece = white_queen;
                     secondPromo.castling_rights = castling_rights;
+                    Move thirdPromo = secondPromo;
+                    thirdPromo.promo_piece = white_rook;
+                    Move fourthPromo = secondPromo;
+                    fourthPromo.promo_piece = white_bishop;
                     moves.push_back(secondPromo);
+                    moves.push_back(thirdPromo);
+                    moves.push_back(fourthPromo);
                 }
                 moves.push_back(move);
 
             }
-            if(en_passant_flag && (target == en_passant_square)){
+            if(target == en_passant_square){
                 int offset = (turn_to_move == white) ? -8 : 8;
                 int captured_piece = position.GetPieceType(target + offset);
                 struct Move move = {pawn, target, ep_capture, captured_piece};
@@ -459,8 +455,14 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
                     struct Move secondPromo = move;
                     secondPromo.castling_rights = castling_rights;
                     secondPromo.promo_piece = white_queen;
+                    Move thirdPromo = secondPromo;
+                    thirdPromo.promo_piece = white_rook;
+                    Move fourthPromo = secondPromo;
+                    fourthPromo.promo_piece = white_bishop;
                     moves.push_back(secondPromo);
-                }
+                    moves.push_back(thirdPromo);
+                    moves.push_back(fourthPromo);
+        }
         moves.push_back(move);
     }
     // Gets double pawn push moves
@@ -587,6 +589,7 @@ vector<Move> Board::GenerateMoveList(){
 
     vector<U64> piece_bitboards;
     vector<Move> move_list;
+    vector<Move> legal_moves;
 
     // Adds all pawn moves for the color to the move list
     GeneratePawnMoves(move_list);
@@ -599,124 +602,135 @@ vector<Move> Board::GenerateMoveList(){
 
     GenerateSliderMoves(move_list);
 
-    ParseLegalMoves(move_list);
+    legal_moves = ParseLegalMoves(move_list);
 
-    return move_list;
+    return legal_moves;
 }
 
-void Board::ParseLegalMoves(vector<Move> &move_list){
-    vector<int> moves_to_delete;
-    auto current_move = move_list.begin();
-    while (current_move != move_list.end()){
-        Move move = *current_move;
-        // Checks to see if any of the squares the king passes through are being attacked
+/* Parses the move list and returns a new move list with only legal moves. I.e. moves that do not put the king
+in check and valid castle moves (no intermediate squares under attack) */
+vector<Move> Board::ParseLegalMoves(vector<Move> move_list){
+
+    vector<Move> legal_moves;
+
+    // Iterate over the move list, only adding moves that are legal
+    for (Move move : move_list)
+    {
+
+        // If the move is a castle move, check that none of the squares the king moves through are under attack
         if(move.move_type == castle){
             if(IsSquareAttacked(move.start, turn_to_move) || IsSquareAttacked(move.end, turn_to_move) || IsSquareAttacked((move.start + move.end)/2, turn_to_move)){
-                current_move = move_list.erase(current_move);
+                continue;
+            }else{
+                legal_moves.push_back(move);
                 continue;
             }
         }
+
+        // Make the move and look if the king is in check. If not, add the move to the list, and unmake it
         MakeMove(move);
+
+        // Since MakeMove() toggles the turn to move, toggle it again when calling the kingincheck() function
         if(!KingInCheck(turn_to_move ^ 1)){
-            current_move++;
-            UnMakeMove(move);
-            continue;
+            legal_moves.push_back(move);
         }
-        else
-        {
-            current_move = move_list.erase(current_move);
-            UnMakeMove(move);
-            continue;
-        }
+        UnMakeMove(move);
     }
+
+    return legal_moves;
 }
 
-
-
+/* This function takes a move object and moves the necessary pieces on the board. It looks at the move type,
+such as castling, promotions, or en passants, and does the necessary board adjustments to accurately make that move.
+At the end of the function, it resets the board's position object to reflect the changes */
 void Board::MakeMove(Move move){
 
-
-    // Gets the type of piece being moves to update it's bitboard
+    // Gets the type of piece being moved to update it's bitboard
     int moving_piece_type = position.GetPieceType(move.start);
 
-    int enemy_color = turn_to_move ^ 1;
 
-    // Pop the bit from both its piece bitboard and color bitboard
-    pop_bit(position.colors[turn_to_move], move.start);
-    pop_bit(position.pieces[moving_piece_type], move.start);
+    // Moves the piece to its ending position
+    MoveBit(position.pieces[moving_piece_type], move.start, move.end);
+    //pop_bit(position.pieces[moving_piece_type], move.start);
 
-    // If the captured piece type is not 0 (indicating a blank) remove it from its respective bitboards
-    if(move.capture && (move.move_type != ep_capture)){
+    // If this is a capture, remove the captured piece from its bitboard
+    if(move.move_type == capture){
         pop_bit(position.pieces[move.capture], move.end);
-        pop_bit(position.colors[enemy_color], move.end);
+
+    // If this is an en passant capture, calculate where the pawn that needs to be captured is, then remove it
     }else if(move.move_type == ep_capture){
         
+        // The offset looks at the piece behind the moving pawn to obtain the pawn to be captured
         int offset = (turn_to_move == white) ? -8 : 8;
         pop_bit(position.pieces[move.capture], (move.end + offset));
-        pop_bit(position.colors[enemy_color], (move.end + offset));
     }
 
-    // Sets the moving piece bit from both its piece and color bitboard
-    set_bit(position.colors[turn_to_move], move.end);
-    if(!move.promo_piece){
-        set_bit(position.pieces[moving_piece_type], move.end);
-    }else{
+    //If this is a promotion, remove the pawn from the last rank and replace it with the promotion choice
+    if(move.promo_piece){
+        pop_bit(position.pieces[moving_piece_type], move.end);
         set_bit(position.pieces[move.promo_piece + turn_to_move * 6], move.end);
     }
 
+    // If this move is a double pawn push, set the en passant square
     if(move.move_type == double_pawn_push){
         en_passant_square = (move.start + move.end) / 2;
-        en_passant_flag = true;
-    }else{
-        en_passant_flag = false;
-    }
-    // Reset castling rights
 
+    // If it is not a double pawn push, reset the en passant square
+    }else{
+        en_passant_square = 0;
+    }
+
+    // If this move is a castle, determine what kind of castle, move the appropriate rook, and adjust castling rights
     if(move.move_type == castle){
-        if(move.end == g1){
-            MoveBit(position.pieces[white_rook], h1, f1);
-            MoveBit(position.colors[white], h1, f1);
-            castling_rights -= 3;
-        }
-        else if (move.end == c1)
-        {
-            MoveBit(position.pieces[white_rook], a1, d1);
-            MoveBit(position.colors[white], a1, d1);
-            castling_rights -= 3;
-        }
-        else if (move.end == c8)
-        {
-            MoveBit(position.pieces[black_rook], a8, d8);
-            MoveBit(position.colors[black], a8, d8);
-            castling_rights -= 12;
-        }
-        else if(move.end == g8){
-            MoveBit(position.pieces[black_rook], h8, f8);
-            MoveBit(position.colors[black], h8, f8);
-            castling_rights -= 12;
+        // Depending on how the king is castling, needs to move the correct rook
+        switch(move.end){
+            case g1:
+                MoveBit(position.pieces[white_rook], h1, f1);
+                break;
+            case c1:
+                MoveBit(position.pieces[white_rook], a1, d1);
+                break;
+            case c8:
+                MoveBit(position.pieces[black_rook], a8, d8);
+                break;
+            case g8:
+                MoveBit(position.pieces[black_rook], h8, f8);
+                break;
         }
     }
-    if(moving_piece_type == white_king){
-        castling_rights &= 12;
-    }
-    else if (moving_piece_type == black_king)
-    {
-        castling_rights &= 3;
-    }else if(moving_piece_type == white_rook){
-        // Take away queenside castle flag
-        if(move.start == a1){
-            castling_rights &= 15 - wq;
-        }else if(move.start == h1){
-            castling_rights &= 15 - wk;
+    // Adjusts castling rights, if a king or rook moves
+    switch(moving_piece_type){
+        // If either of the kings move, take away castling rights for that color
+        case white_king:
+            castling_rights &= 12;
+            break;
+        case black_king:
+            castling_rights &= 3;
+            break;
+
+        // If a rook moves, look at the starting square to determine which side (king/queen) loses castling rights
+        case white_rook:
+            if(move.start == a1){
+                castling_rights &= 15 - wq;
+            }
+            else if(move.start == h1){
+                castling_rights &= 15 - wk;
+            }
+            break;
+
+        case black_rook:
+            if(move.start == a8){
+                castling_rights &= 15 - bq;
+            }else if(move.start == h8){
+                castling_rights &= 15 - bk;
+            }
+            break;
         }
-    }else if(moving_piece_type == black_rook){
-        if(move.start == a8){
-            castling_rights &= 15 - bq;
-        }else if(move.start == h8){
-            castling_rights &= 15 - bk;
-        }
-    }
-    position.ResetOccupancy();
+
+    // Updates the position pieces
+    position.Update();
+    InitSliderAttacks();
+    // Switches whose turn it is to play
     ToggleMove();
 }
 
@@ -731,110 +745,104 @@ void Board::MakeMove(int start, int end){
     printf("Invalid Move!\n");
 }
 
+/* Given a move object, reverse the operations performed by MakeMove(). This restores all aspects of the game state, such
+as castling rights and piece positions */
 void Board::UnMakeMove(Move move)
 {
+    // Since we are unmaking a move, the turn of the move we are unmaking is the opposite of the turn right now
     int piece_color = turn_to_move ^ 1;
-    int enemy_color = turn_to_move;
 
     // Gets the type of piece being moves to update it's bitboard
     int moving_piece_type = position.GetPieceType(move.end);
 
-    // Resets the piece to its starting position on piece and color bitboards
-    if(!move.promo_piece){
-        set_bit(position.pieces[moving_piece_type], move.start);
-    }else{
+    // Moves the piece back to its origin
+    MoveBit(position.pieces[moving_piece_type], move.end, move.start);
+
+    // If the move was a promotion move, remove the piece and replace it with the appropriate pawn color
+    if(move.promo_piece){
+        pop_bit(position.pieces[moving_piece_type], move.start);
+
+        // Uses the color of the piece to determine whether to place a white or black pawn at the start
         set_bit(position.pieces[white_pawn + piece_color * 6], move.start);
     }
 
-    set_bit(position.colors[piece_color], move.start);
-
-    // Removes the piece from its end position on piece and color bitboards
-    pop_bit(position.pieces[moving_piece_type], move.end);
-    pop_bit(position.colors[piece_color], move.end);
-
+    // If the move type was a capture, then respawn the captured piece at its location
     if(move.move_type == capture){
         set_bit(position.pieces[move.capture], move.end);
-        set_bit(position.colors[enemy_color], move.end);
+
+    // If the move type was an en_passant capture, respawn the pawn 1 square "behind" the moves end position
     }else if(move.move_type == ep_capture){
         int offset = (piece_color == white) ? -8 : 8;
         set_bit(position.pieces[move.capture], (move.end + offset));
-        set_bit(position.colors[enemy_color], (move.end + offset));
     }
 
+    // If the move type was a castle, reset the rook to it's original position
     if(move.move_type == castle){
-        if(move.end == g1){
-            MoveBit(position.pieces[white_rook], f1, h1);
-            MoveBit(position.colors[white], f1, h1);
-            castling_rights += 3;
-        }
-        else if (move.end == c1)
-        {
-            MoveBit(position.pieces[white_rook], d1, a1);
-            MoveBit(position.colors[white], d1, a1);
-            castling_rights += 3;
-        }
-        else if (move.end == c8)
-        {
-            MoveBit(position.pieces[black_rook], d8, a8);
-            MoveBit(position.colors[black], d8, a8);
-            castling_rights += 12;
-        }
-        else if(move.end == g8){
-            MoveBit(position.pieces[black_rook], f8, h8);
-            MoveBit(position.colors[black], f8, h8);
-            castling_rights += 12;
+
+        // Depending on the move's end postition, move the correct rook back to its original position
+        switch(move.end){
+            case g1:
+                MoveBit(position.pieces[white_rook], f1, h1);
+                break;
+            case c1:
+                MoveBit(position.pieces[white_rook], d1, a1);
+                break;
+            case g8:
+                MoveBit(position.pieces[black_rook], f8, h8);
+                break;
+            case c8:
+                MoveBit(position.pieces[black_rook], d8, a8);
+                break;
         }
     }
+
+    // Reset castling rights to whatever they were when the move was originally made
     castling_rights = move.castling_rights;
+
+    // Update board's position
+    position.Update();
+    InitSliderAttacks();
     ToggleMove();
 }
 
+/* Returns true if the king of the input color is being attacked by any other enemy piece */
 bool Board::KingInCheck(int color){
     
+    // Offset determines what color of king to retrieve
     int offset = 6 * color;
     U64 king = position.pieces[white_king + offset];
-    int king_square = SerializeBitboard(king).at(0);
+
+    // Retrieves the index of the king's location
+    int king_square = BitScan(king);
+
+
+    // If the king square is being attacked, return true, since it is in check
     return IsSquareAttacked(king_square, color);
 }
 
+/* Returns true if a piece on a square of a given color could be attacked by an enemy of the opposite color */
 bool Board::IsSquareAttacked(int square, int color){
 
-    InitSliderAttacks();
     int enemy_offset = 6 * (color ^ 1);
 
     // Retrieves the bitboard of enemy pawns opposite the kings color
     U64 enemy_pawns = position.pieces[white_pawn + enemy_offset];
-    // 
-    if(pawn_attacks[color][square] & enemy_pawns){
-        return true;
-    }
-
     U64 enemy_knights = position.pieces[white_knight + enemy_offset];
-    if(knight_attacks[square] & enemy_knights){
-        return true;
-    }
-
     U64 enemy_king = position.pieces[white_king + enemy_offset];
-    if(king_attacks[square] & enemy_king){
-        return true;
-    }
-
     U64 enemy_rooks = position.pieces[white_rook + enemy_offset];
-    if(rook_attacks[square] & enemy_rooks){
-        return true;
-    }
-
     U64 enemy_bishops = position.pieces[white_bishop + enemy_offset];
-    if(bishop_attacks[square] & enemy_bishops){
-        return true;
-    }
-
     U64 enemy_queens = position.pieces[white_queen + enemy_offset];
-    if(queen_attacks[square] & enemy_queens){
-        return true;
-    }
+    
+    // Goes through every piece type, looking for a possible attack
+    bool attacked_by_pawn = pawn_attacks[color][square] & enemy_pawns;
+    bool attacked_by_knight = knight_attacks[square] & enemy_knights;
+    bool attacked_by_king = king_attacks[square] & enemy_king;
+    bool attacked_by_rook = rook_attacks[square] & enemy_rooks;
+    bool attacked_by_bishop = bishop_attacks[square] & enemy_bishops;
+    bool attacked_by_queen = queen_attacks[square] & enemy_queens;
 
-    return false;
+    // If any of these are true, the square is under attack
+    return attacked_by_pawn | attacked_by_knight | attacked_by_rook | attacked_by_queen | attacked_by_king | attacked_by_bishop;
 }
 
 int Board::perft(int depth){
@@ -846,16 +854,10 @@ int Board::perft(int depth){
     }
 
     vector<Move> moves = GenerateMoveList();
-    if(moves.size() == 0){
-        checkmates += 1;
-    }
     for (Move move : moves)
     {
         MakeMove(move);
         
-        if(move.move_type == capture && depth==1){
-            captures += 1;
-        }
         nodes += perft(depth - 1);
         
         
@@ -870,8 +872,6 @@ void Board::perft_test(int depth){
     clock_t start;
     double duration;
     start = clock();
-    captures = 0;
-    
     
     
     int total_count = 0;
@@ -887,8 +887,6 @@ void Board::perft_test(int depth){
     duration = (clock() - start) / (double)CLOCKS_PER_SEC;
     printf("Perft: %d nodes searched\n", total_count);
     printf("Took %f seconds\n", duration);
-    printf("Number of captures: %d\n", captures);
-    printf("Number of checkmates: %d\n", checkmates);
 }
 
 void Board::ToggleMove(){

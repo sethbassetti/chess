@@ -33,10 +33,12 @@ Position::Position(){
               black_pawns, black_rooks, black_knights, black_bishops, black_queens, black_kings};
     colors = {white_pieces, black_pieces};
     en_passant = false;
-    ResetOccupancy();
+    Update();
 }
 
-void Position::ResetOccupancy(){
+void Position::Update(){
+    colors[white] = pieces[1] | pieces[2] | pieces[3] | pieces[4] | pieces[5] | pieces[6];
+    colors[black] = pieces[7] | pieces[8] | pieces[9] | pieces[10] | pieces[11] | pieces[12];
     occupancy = colors[white] | colors[black];
     empty = ~occupancy;
 }
