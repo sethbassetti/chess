@@ -37,6 +37,7 @@ Board::Board(){
 
 /* Test function for implementing and development */
 void Board::Test(){
+    /*
     MakeMove(e2, e4);
     MakeMove(d7, d5);
     MakeMove(e4, e5);
@@ -48,7 +49,8 @@ void Board::Test(){
     MakeMove(g2, g4);
     MakeMove(c7, c5);
     position.PrintBoard();
-    perft_test(4);
+    */
+    perft_test(3);
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -405,13 +407,11 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
                 // Retrieve which type of piece is being captured
                 int captured_piece = position.GetPieceType(target);
                 struct Move move = {pawn, target, capture, captured_piece};
-                move.castling_rights = castling_rights;
                 if (get_bit(first_last_ranks, target))
                 {
                     move.promo_piece = white_knight;
                     struct Move secondPromo = move;
                     secondPromo.promo_piece = white_queen;
-                    secondPromo.castling_rights = castling_rights;
                     Move thirdPromo = secondPromo;
                     thirdPromo.promo_piece = white_rook;
                     Move fourthPromo = secondPromo;
@@ -427,7 +427,6 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
                 int offset = (turn_to_move == white) ? -8 : 8;
                 int captured_piece = position.GetPieceType(target + offset);
                 struct Move move = {pawn, target, ep_capture, captured_piece};
-                move.castling_rights = castling_rights;
                 moves.push_back(move);
             }
         }
@@ -448,12 +447,10 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
         // below the target. This is because for a single pawn push, the origin will always be the previous rank
         int start = target - 8 * color_flag;
         struct Move move = {start, target, quiet, blank};
-        move.castling_rights = castling_rights;
         
         if(get_bit(first_last_ranks, target)){
                     move.promo_piece = white_knight;
                     struct Move secondPromo = move;
-                    secondPromo.castling_rights = castling_rights;
                     secondPromo.promo_piece = white_queen;
                     Move thirdPromo = secondPromo;
                     thirdPromo.promo_piece = white_rook;
@@ -472,7 +469,6 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
         // square
         int start = target - 16 * color_flag;
         struct Move move = {start, target, double_pawn_push, blank};
-        move.castling_rights = castling_rights;
         moves.push_back(move);
     }
 
@@ -518,14 +514,14 @@ void Board::GenerateKingMoves(vector<Move> &move_list){
         // Kingside castling rights
         if(castling_rights & wk){
             if(!(wk_castle_occupancy & position.occupancy)){
-                Move castle_move = {king_indices.at(0), g1, castle, 0, 0, castling_rights};
+                Move castle_move = {king_indices.at(0), g1, castle};
                 move_list.push_back(castle_move);
             }
         }
         // Queenside castling rights
         if(castling_rights & wq){
             if(!(wq_castle_occupancy & position.occupancy)){
-                Move castle_move = {king_indices.at(0), c1, castle, 0, 0, castling_rights};
+                Move castle_move = {king_indices.at(0), c1, castle};
                 move_list.push_back(castle_move);
             }
         }
@@ -533,14 +529,14 @@ void Board::GenerateKingMoves(vector<Move> &move_list){
         // Kingside castling rights
         if(castling_rights & bk){
             if(!(bk_castle_occupancy & position.occupancy)){
-                Move castle_move = {king_indices.at(0), g8, castle, 0, 0, castling_rights};
+                Move castle_move = {king_indices.at(0), g8, castle};
                 move_list.push_back(castle_move);
             }
         }
         // Queenside castling rights
         if(castling_rights & bq){
             if(!(bq_castle_occupancy & position.occupancy)){
-                Move castle_move = {king_indices.at(0), c8, castle, 0, 0, castling_rights};
+                Move castle_move = {king_indices.at(0), c8, castle};
                 move_list.push_back(castle_move);
             }
         }
@@ -575,7 +571,6 @@ void Board::FillMoveList(vector<int> piece_list, U64 attack_map[64], vector<Move
         for(int target : targets){
             int captured_piece = position.GetPieceType(target);
             Move move = {piece, target, quiet, captured_piece};
-            move.castling_rights = castling_rights;
             if (captured_piece)
             {
                 move.move_type = capture;
@@ -644,6 +639,17 @@ vector<Move> Board::ParseLegalMoves(vector<Move> move_list){
 such as castling, promotions, or en passants, and does the necessary board adjustments to accurately make that move.
 At the end of the function, it resets the board's position object to reflect the changes */
 void Board::MakeMove(Move move){
+
+    // Before making the move, store the board's game state so that this move can be unmade
+    gameState state = {position, castling_rights, en_passant_square};
+
+    // Stores the slider attacks so InitSliderAttacks() does not have to be called on unmake move
+    memcpy(state.queen_attacks, queen_attacks, sizeof(queen_attacks));
+    memcpy(state.rook_attacks, rook_attacks, sizeof(rook_attacks));
+    memcpy(state.bishop_attacks, bishop_attacks, sizeof(bishop_attacks));
+
+    // Pushes the state onto the game history stack
+    game_state_hist.push_back(state);
 
     // Gets the type of piece being moved to update it's bitboard
     int moving_piece_type = position.GetPieceType(move.start);
@@ -734,74 +740,32 @@ void Board::MakeMove(Move move){
     ToggleMove();
 }
 
-void Board::MakeMove(int start, int end){
+/* Attempts to make a move with a starting and ending square, returns 1 if successful, 0 otherwise */
+int Board::MakeMove(int start, int end){
     vector<Move> moves = GenerateMoveList();
     for(Move move : moves){
         if(start == move.start && end == move.end){
             MakeMove(move);
-            return;
+            return 1;
         }
     }
     printf("Invalid Move!\n");
+    return 0;
 }
 
 /* Given a move object, reverse the operations performed by MakeMove(). This restores all aspects of the game state, such
 as castling rights and piece positions */
 void Board::UnMakeMove(Move move)
 {
-    // Since we are unmaking a move, the turn of the move we are unmaking is the opposite of the turn right now
-    int piece_color = turn_to_move ^ 1;
 
-    // Gets the type of piece being moves to update it's bitboard
-    int moving_piece_type = position.GetPieceType(move.end);
-
-    // Moves the piece back to its origin
-    MoveBit(position.pieces[moving_piece_type], move.end, move.start);
-
-    // If the move was a promotion move, remove the piece and replace it with the appropriate pawn color
-    if(move.promo_piece){
-        pop_bit(position.pieces[moving_piece_type], move.start);
-
-        // Uses the color of the piece to determine whether to place a white or black pawn at the start
-        set_bit(position.pieces[white_pawn + piece_color * 6], move.start);
-    }
-
-    // If the move type was a capture, then respawn the captured piece at its location
-    if(move.move_type == capture){
-        set_bit(position.pieces[move.capture], move.end);
-
-    // If the move type was an en_passant capture, respawn the pawn 1 square "behind" the moves end position
-    }else if(move.move_type == ep_capture){
-        int offset = (piece_color == white) ? -8 : 8;
-        set_bit(position.pieces[move.capture], (move.end + offset));
-    }
-
-    // If the move type was a castle, reset the rook to it's original position
-    if(move.move_type == castle){
-
-        // Depending on the move's end postition, move the correct rook back to its original position
-        switch(move.end){
-            case g1:
-                MoveBit(position.pieces[white_rook], f1, h1);
-                break;
-            case c1:
-                MoveBit(position.pieces[white_rook], d1, a1);
-                break;
-            case g8:
-                MoveBit(position.pieces[black_rook], f8, h8);
-                break;
-            case c8:
-                MoveBit(position.pieces[black_rook], d8, a8);
-                break;
-        }
-    }
-
-    // Reset castling rights to whatever they were when the move was originally made
-    castling_rights = move.castling_rights;
-
-    // Update board's position
-    position.Update();
-    InitSliderAttacks();
+    gameState prev_state = game_state_hist.back();
+    game_state_hist.pop_back();
+    castling_rights = prev_state.castling_rights;
+    memcpy(queen_attacks, prev_state.queen_attacks, sizeof(queen_attacks));
+    memcpy(rook_attacks, prev_state.rook_attacks, sizeof(rook_attacks));
+    memcpy(bishop_attacks, prev_state.bishop_attacks, sizeof(bishop_attacks));
+    en_passant_square = prev_state.en_passant_square;
+    position = prev_state.position;
     ToggleMove();
 }
 
@@ -891,4 +855,16 @@ void Board::perft_test(int depth){
 
 void Board::ToggleMove(){
     turn_to_move ^= 1;
+}
+
+void Board::Display(){
+    position.PrintBoard();
+}
+
+int Board::GetCurrentPlayer(){
+    return turn_to_move;
+}
+
+Position Board::GetPosition(){
+    return position;
 }

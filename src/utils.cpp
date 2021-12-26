@@ -94,3 +94,14 @@ void MoveBit(U64 &bitboard, int start, int end){
     pop_bit(bitboard, start);
     set_bit(bitboard, end);
 }
+
+int GetIndexFromSquare(char* square){
+    string s(square);
+    for (int i = 0; i < 64; i++)
+    {
+        if(square_index[i] == s){
+            return i;
+        }
+    }
+    return -1;
+}

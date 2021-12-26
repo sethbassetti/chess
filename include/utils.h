@@ -16,6 +16,8 @@ const U64 wq_castle_occupancy = 0xeULL;  // Squares set in between white rook an
 const U64 bk_castle_occupancy = 0x6000000000000000ULL; // Squares set in between black rook and king/kingside castle
 const U64 bq_castle_occupancy = 0xe00000000000000ULL; // Squares set in between black rook and king for queenside castle
 
+
+
 // Contains information that represents a move
 struct Move{
     int start;
@@ -23,7 +25,6 @@ struct Move{
     int move_type;
     int capture;
     int promo_piece;
-    int castling_rights;
 };
 
 enum moveType
@@ -91,3 +92,4 @@ void PrintMove(struct Move move);
 
 void MoveBit(U64 &bitboard, int start, int end);
 
+int GetIndexFromSquare(char *square);

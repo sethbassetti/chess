@@ -1,10 +1,9 @@
 #include<iostream>
-#include "board.h"
+#include "game.h"
 using namespace std;
 
 
 int main(){
-
-    Board x;
-    x.Test();
+    Game game;
+    game.Start();
 }

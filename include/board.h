@@ -34,6 +34,15 @@ enum enumDirections
     West,
 };
 
+struct gameState{
+    Position position;
+    int castling_rights;
+    int en_passant_square;
+    U64 rook_attacks[64];
+    U64 bishop_attacks[64];
+    U64 queen_attacks[64];
+};
+
 class Board
 {
 
@@ -42,6 +51,18 @@ public:
     Board();
 
     void Test();
+
+    // Chooses a move via the start and end positions and calls the make move function
+    int MakeMove(int start, int end);
+    void MakeMove(Move move);
+
+    
+    void Display();
+
+    std::vector<Move> GenerateMoveList();
+
+    int GetCurrentPlayer();
+    Position GetPosition();
 
 private:
     // Board state variables
@@ -52,6 +73,9 @@ private:
 
     // This stores castling rights
     int castling_rights;
+
+    // Stores history of game states so that moves can be unmade efficiently
+    vector<gameState> game_state_hist;
 
     // Stores precalculated attack tables for various pieces
     U64 pawn_attacks[2][64];    // Moves of pawns depend on their color so we need two sides.
@@ -94,7 +118,7 @@ private:
     // Gets a specific ray attack on a square in a direction (does not penetrate other pieces)
     U64 GetDirRayAttacks(enumDirections direction, int square);
 
-    std::vector<Move> GenerateMoveList();
+
 
     int GetPieceType(int index);
 
@@ -105,8 +129,7 @@ private:
 
     void FillMoveList(std::vector<int> piece_indices, U64 attack_map[64], std::vector<Move> &move_list);
 
-    void MakeMove(Move move);
-    void MakeMove(int start, int end);
+
     void UnMakeMove(Move move);
 
     std::vector<Move> ParseLegalMoves(std::vector<Move> move_list);
@@ -119,4 +142,6 @@ private:
     void perft_test(int depth);
 
     void ToggleMove();
+
+ 
 };

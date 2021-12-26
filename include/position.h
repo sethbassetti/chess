@@ -24,9 +24,8 @@ public:
 
     int GetPieceType(int index);
 
-    
 
-    // Prints out board in chess format based on position object
+        // Prints out board in chess format based on position object
     void PrintBoard();
 };
 
