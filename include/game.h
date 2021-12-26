@@ -22,4 +22,7 @@ class Game{
         void MakeAIMove();
 
         void UpdateGame();
+
+        Move NegaMaxRoot(int depth);
+        int NegaMax(int depth);
 };

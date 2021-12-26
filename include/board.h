@@ -55,6 +55,7 @@ public:
     // Chooses a move via the start and end positions and calls the make move function
     int MakeMove(int start, int end);
     void MakeMove(Move move);
+    void UnMakeMove(Move move);
 
     
     void Display();
@@ -130,7 +131,7 @@ private:
     void FillMoveList(std::vector<int> piece_indices, U64 attack_map[64], std::vector<Move> &move_list);
 
 
-    void UnMakeMove(Move move);
+
 
     std::vector<Move> ParseLegalMoves(std::vector<Move> move_list);
 

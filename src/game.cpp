@@ -96,14 +96,9 @@ void Game::MakePlayerMove(){
 }
 
 void Game::MakeAIMove(){
-    vector<Move> move_list = game_board.GenerateMoveList();
-    Move bestMove;
-    for(Move move : move_list){
-        
-    }
-    int random_move = rand() % move_list.size();
-    Move move = move_list[random_move];
-    game_board.MakeMove(move);
+
+    Move best_move = NegaMaxRoot(4);
+    game_board.MakeMove(best_move);
 }
 
 int Game::IsValidInput(string input){
@@ -153,3 +148,45 @@ void Game::UpdateGame(){
     }
 }
 
+Move Game::NegaMaxRoot(int depth){
+    vector<Move> moves = game_board.GenerateMoveList();
+    Move best_move;
+    int score;
+    int best_score = -1000000;
+    for (Move move : moves)
+    {
+        // White turn
+        game_board.MakeMove(move);
+        // Black turn
+        score = -NegaMax(depth - 1);
+        game_board.UnMakeMove(move);
+        if(score > best_score){
+            best_score = score;
+            best_move = move;
+        }
+    }
+    return best_move;
+}
+
+int Game::NegaMax(int depth){
+    int score;
+    int max = -1000000;
+
+    if (depth == 0)
+    {
+        // If position is better for black, returns negative, 
+        return Evaluate(game_board.GetPosition(), game_board.GetCurrentPlayer());
+    }
+
+    
+    for(Move move : game_board.GenerateMoveList()){
+        game_board.MakeMove(move);
+        score = -NegaMax(depth - 1);
+        game_board.UnMakeMove(move);
+        if(score > max){
+            max = score;
+        }
+    }
+
+    return max;
+}
