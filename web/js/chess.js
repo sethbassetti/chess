@@ -16,7 +16,7 @@ function initBoard() {
         draggable: true,
         onDrop: onDrop
       }
-    board = Chessboard('board', config);
+  board = Chessboard('board', config);
 }
 
 /* Starts the game. Gets the starting color from the radio button, starts the board and determines it's orientation */
@@ -24,21 +24,29 @@ function startGame() {
     currentColor = $("input[name='colorSelector']:checked").val();
     board.start('false');
     board.orientation(currentColor);
+  Module.ResetBoard();
 }
 
 function onDrop(source, target, piece, newPos, oldPos, orientation) {
   var source_index = squareIndexes.indexOf(source);
   var target_index = squareIndexes.indexOf(target);
 
+
     
-  if (!isLegalMove(source_index, target_index, oldPos)) {
+  if (!isLegalMove(source_index, target_index)) {
     return 'snapback'
+  } else {
+    Module.MakeAIMove();
+    
   }
-  }
+  console.log(Module.GetBoardPosition());
+  board.position(Module.GetBoardPosition(), false);   
+
+}
 
 
 function isLegalMove(source, target, oldPosition) {
-  var validMove = Module.IsValidMove("hello", 3, source, target);
+  var validMove = Module.IsValidMove(source, target);
   return validMove;
 }
 

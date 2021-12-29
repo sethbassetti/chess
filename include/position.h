@@ -28,8 +28,9 @@ public:
         // Prints out board in chess format based on position object
     void PrintBoard();
 
-    private:
+    std::string GenerateFEN();
 
-        void SetPieceOnBitboard(char piece, int square);
-        void ParseFEN(std::string fen_string);
+private:
+    void SetPieceOnBitboard(char piece, int square);
+    void ParseFEN(std::string fen_string);
 };

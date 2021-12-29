@@ -10,7 +10,9 @@ TARGET = main
 #These just denote which folders to store files in
 BIN = bin
 SRC = src
-INCLUDE = -I include 
+INCLUDE = -I include -I /home/sethbassetti/emsk/emsdk/upstream/include
+
+all: $(BIN)/$(TARGET)
 
 run: clean all
 	clear

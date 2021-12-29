@@ -7,6 +7,7 @@
 #include <assert.h>  
 #include <ctime>
 #include <vector>
+#include <algorithm>
 #include "utils.h"
 #include "board.h"
 #include "position.h"
@@ -14,9 +15,9 @@
 
 using namespace std;
 
+
 // Constructor for board, initializes board position and preset attack tables
 Board::Board(){
-    
     // Constructs a position object that holds information about piece positions, sets up initial board position
     position = Position();
 
@@ -42,12 +43,7 @@ Board::Board(std::string fen_string){
     // Builds the position based on the fen_string
     position = Position(fen_string);
 
-    turn_to_move = white;
-
-    en_passant_square = 0;
-
-    // Sets castling rights such that all castling is available at the start (no pieces have moved)
-    castling_rights = wk | wq | bk | bq;
+    ParseFENColorCastling(fen_string);
 
     // Initializes leaper attack tables, since they are independent of board position
     InitLeaperAttacks();
@@ -56,22 +52,85 @@ Board::Board(std::string fen_string){
     InitRayAttacks();
 }
 
+void Board::ParseFENColorCastling(string fen_string){
+    char *token;
+
+    // Copies the fen_string variable into a char array to work with easier
+    char char_fen[fen_string.size() + 1];
+    fen_string.copy(char_fen, fen_string.size() + 1);
+    char_fen[fen_string.size()] = '\0';
+
+    // Gets the first segment of the FEN
+    token = strtok(char_fen, " ");
+
+    // Gets the second segment of the FEN
+    token = strtok(NULL, " ");
+
+    // Determines the current turn
+    if(strcmp(token, "w") == 0){
+        turn_to_move = white;
+    }else{
+        turn_to_move = black;
+    }
+
+    // Determines the castling rights
+    token = strtok(NULL, " ");
+    
+    // Copies the token to a string for easier iteration
+    string castling_right_string;
+    castling_right_string.append(token);
+    
+    // Sets castling rights to 0 at first and then builds them up
+    castling_rights = 0;
+    
+
+    // Iterates over each character in the string
+    for (unsigned int i = 0; i < castling_right_string.size(); i++){
+        
+        // Otherwise, look at each character and assign appropriate castling rights
+        switch(castling_right_string.at(i)){
+            case 'K':
+                castling_rights |= wk;
+                break;
+            case 'Q':
+                castling_rights |= wq;
+                break;
+            case 'k':
+                castling_rights |= bk;
+                break;
+            case 'q':
+                castling_rights |= bq;
+                break;
+            }
+    }
+
+    // Determine en passant square
+    token = strtok(NULL, " ");
+    
+    // If character is a dash, no en passant is available
+    if(token[0] == '-'){
+        en_passant_square = 0;
+    
+    // Otherwise, set the en passant square
+    }else{
+        // Converting the token into a string for easy iteration
+        string en_passant_square_string;
+        en_passant_square_string.append(token);
+
+        // Finds the index of the square in the square_index table
+        auto it = std::find(square_index.begin(), square_index.end(), en_passant_square_string);
+        int square_index_num = it - square_index.begin();
+
+        // Sets the ne passant square to that number
+        en_passant_square = square_index_num;
+    }
+}
 /* Test function for implementing and development */
 void Board::Test(){
-    /*
-    MakeMove(e2, e4);
-    MakeMove(d7, d5);
-    MakeMove(e4, e5);
-    MakeMove(d5, d4);
-    MakeMove(f1, c4);
-    MakeMove(b8, a6);
-    MakeMove(g1, f3);
-    MakeMove(d8, d5);
-    MakeMove(g2, g4);
-    MakeMove(c7, c5);
     position.PrintBoard();
-    */
-    perft_test(3);
+    printf("%d\n", turn_to_move);
+    printf("%d\n", castling_rights);
+    printf("%d\n", en_passant_square);
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -416,44 +475,45 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
     vector<int> pawn_indices = SerializeBitboard(pawns);
 
     // Get pawn attacks
-    for(int pawn : pawn_indices){
-
-        // Iterates through each posible attack the pawn could make 
-        vector<int> attack_indices = SerializeBitboard(pawn_attacks[turn_to_move][pawn]);
-
-        // Iterates through the attacks, adding moves to the move list
-        for(int target : attack_indices){
-            // If the bit is set on enemy pieces, this is a capture
-            if(get_bit(enemy_pieces, target)){
-                // Retrieve which type of piece is being captured
-                int captured_piece = position.GetPieceType(target);
-                struct Move move = {pawn, target, capture, captured_piece};
-                if (get_bit(first_last_ranks, target))
+    for(int pawn : pawn_indices)
                 {
-                    move.promo_piece = white_knight;
-                    struct Move secondPromo = move;
-                    secondPromo.promo_piece = white_queen;
-                    Move thirdPromo = secondPromo;
-                    thirdPromo.promo_piece = white_rook;
-                    Move fourthPromo = secondPromo;
-                    fourthPromo.promo_piece = white_bishop;
-                    moves.push_back(secondPromo);
-                    moves.push_back(thirdPromo);
-                    moves.push_back(fourthPromo);
+
+                    // Iterates through each posible attack the pawn could make
+                    vector<int> attack_indices = SerializeBitboard(pawn_attacks[turn_to_move][pawn]);
+
+                    // Iterates through the attacks, adding moves to the move list
+                    for (int target : attack_indices)
+                    {
+                        // If the bit is set on enemy pieces, this is a capture
+                        if (get_bit(enemy_pieces, target))
+                        {
+                            // Retrieve which type of piece is being captured
+                            int captured_piece = position.GetPieceType(target);
+                            struct Move move = {pawn, target, capture, captured_piece};
+                            if (get_bit(first_last_ranks, target))
+                            {
+                                move.promo_piece = white_knight;
+                                struct Move secondPromo = move;
+                                secondPromo.promo_piece = white_queen;
+                                Move thirdPromo = secondPromo;
+                                thirdPromo.promo_piece = white_rook;
+                                Move fourthPromo = secondPromo;
+                                fourthPromo.promo_piece = white_bishop;
+                                moves.push_back(secondPromo);
+                                moves.push_back(thirdPromo);
+                                moves.push_back(fourthPromo);
+                            }
+                            moves.push_back(move);
+                        }
+                        if (target == en_passant_square)
+                        {
+                            int offset = (turn_to_move == white) ? -8 : 8;
+                            int captured_piece = position.GetPieceType(target + offset);
+                            struct Move move = {pawn, target, ep_capture, captured_piece};
+                            moves.push_back(move);
+                        }
+                    }
                 }
-                moves.push_back(move);
-
-            }
-            if(target == en_passant_square){
-                int offset = (turn_to_move == white) ? -8 : 8;
-                int captured_piece = position.GetPieceType(target + offset);
-                struct Move move = {pawn, target, ep_capture, captured_piece};
-                moves.push_back(move);
-            }
-        }
-
-    }
-        
 
     // Calls CalcPawnPushes() to construct setwise pawn push tables
     CalcPawnPushes();
@@ -888,4 +948,20 @@ int Board::GetCurrentPlayer(){
 
 Position Board::GetPosition(){
     return position;
+}
+
+int Board::IsValidMove(int start, int end)
+{
+    vector<Move> moves = GenerateMoveList();
+    for(Move move : moves){
+        if(move.start == start && move.end == end){
+            MakeMove(move);
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string Board::GetBoardFEN(){
+    return position.GenerateFEN();
 }

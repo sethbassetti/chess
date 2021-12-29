@@ -68,6 +68,10 @@ public:
     int GetCurrentPlayer();
     Position GetPosition();
 
+    int IsValidMove(int start, int end);
+
+    std::string GetBoardFEN();
+
 private:
     // Board state variables
     Position position;      // Holds the position of all pieces on the board
@@ -147,5 +151,5 @@ private:
 
     void ToggleMove();
 
- 
+    void ParseFENColorCastling(std::string fen_string);
 };

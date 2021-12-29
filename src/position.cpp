@@ -34,7 +34,7 @@ Position::Position(){
     pieces = {null, white_pawns, white_rooks, white_knights, white_bishops, white_queens, white_kings,
               black_pawns, black_rooks, black_knights, black_bishops, black_queens, black_kings};
     colors = {white_pieces, black_pieces};
-    
+
     Update();
 }
 
@@ -65,6 +65,7 @@ Position::Position(std::string fen_string){
 
     pieces = {null, white_pawns, white_rooks, white_knights, white_bishops, white_queens, white_kings,
               black_pawns, black_rooks, black_knights, black_bishops, black_queens, black_kings};
+    
     colors = {white_pieces, black_pieces};
     ParseFEN(fen_string);
     Update();
@@ -111,9 +112,10 @@ void Position::ParseFEN(std::string fen_string){
     int rank = 7;
     int file = 0;
     /* This for loop will place the pieces on the boards */
-    for (int i = 0; i < fen_string.length(); i++){
+    for (unsigned int i = 0; i < fen_string.length(); i++){
         // Retrieves the token in the fen_string
         char token = fen_string.at(i);
+        int square_index = rank * 8 + file;
 
         // If it is a whitespace, break out of this for loop since we are done assigning pieces
         if(token == ' '){
@@ -132,8 +134,8 @@ void Position::ParseFEN(std::string fen_string){
 
         // Otherwise, it is a letter, so set the piece on the bitboard
         }else{
-            int square_index = rank * 8 + file;
             SetPieceOnBitboard(token, square_index);
+            file += 1;
         }
     }
 }
@@ -141,13 +143,47 @@ void Position::ParseFEN(std::string fen_string){
 /* Given a character representing the piece and a square, places the piece on that square */
 void Position::SetPieceOnBitboard(char token, int square){
     // A vector of characters that holds the same indexes as the pieces vector in the position class
-    vector<char> pieces = {'0', 'P', 'R', 'N', 'B', 'Q', 'K', 'p', 'r', 'n', 'b', 'q', 'k'};
+    vector<char> piece_chars = {'0', 'P', 'R', 'N', 'B', 'Q', 'K', 'p', 'r', 'n', 'b', 'q', 'k'};
 
     // Finds the index of the character in the character vector 
-    auto it = std::find(pieces.begin(), pieces.end(), token);
-    int piece_index = it - pieces.begin();
+    auto it = std::find(piece_chars.begin(), piece_chars.end(), token);
+    int piece_index = it - piece_chars.begin();
 
     // Uses the index to retrieve the piece bitboard and sets the bit corresponding to the square
-    U64 piece_table = pieces[piece_index];
-    set_bit(piece_table, square);
+    set_bit(pieces[piece_index], square);
+}
+
+std::string Position::GenerateFEN(){
+    int rank = 7;
+    int file = 0;
+    std::string fen_string;
+
+    // A vector of characters that holds the same indexes as the pieces vector in the position class
+    vector<char> piece_chars = {'0', 'P', 'R', 'N', 'B', 'Q', 'K', 'p', 'r', 'n', 'b', 'q', 'k'};
+
+    for (int rank = 7; rank >= 0; rank--){
+        int empty_counter = 0;
+        for (int file = 0; file < 8; file++)
+        {
+            int square_index = rank * 8 + file;
+            int piece_type = GetPieceType(square_index);
+            if(piece_type){
+                if(empty_counter){
+                    fen_string.append(to_string(empty_counter));
+                    empty_counter = 0;
+                }
+                fen_string.push_back(piece_chars[piece_type]);
+            }else{
+                empty_counter++;
+            }
+        }
+        if(empty_counter){
+            fen_string.append(to_string(empty_counter));
+        }
+        if(rank != 0){
+            fen_string.append("/");
+        }
+        
+    }
+    return fen_string;
 }
