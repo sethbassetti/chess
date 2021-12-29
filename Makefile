@@ -10,16 +10,14 @@ TARGET = main
 #These just denote which folders to store files in
 BIN = bin
 SRC = src
-INCLUDE = include
-
-all: $(BIN)/$(TARGET)
+INCLUDE = -I include 
 
 run: clean all
 	clear
 	./$(BIN)/$(TARGET)
 
 $(BIN)/$(TARGET): $(SRC)/*.cpp
-	$(CXX) $(CXX_FLAGS) -I$(INCLUDE) $^ -o $@ 
+	$(CXX) $(CXX_FLAGS) $(INCLUDE) $^ -o $@ 
 
 clean:
 	-rm $(BIN)/*

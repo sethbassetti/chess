@@ -1,0 +1,45 @@
+/* Removes the margin around the body so it fits to the edges */
+body{
+    height: 100%;
+    overflow-y: hidden;
+    margin: 0;
+}
+
+#board{
+    margin:0;
+    height: 100vh;
+    width: auto;
+    aspect-ratio: 1;
+    float: left;
+}
+
+
+#ui{
+
+    height:100vh;
+    width: auto;
+    box-shadow:0px 0px 0px 2px black inset;
+    z-index: 500;
+}
+
+.white{
+    background-color: #EFD9B4;
+}
+
+.black{
+    background-color: #B68864;
+}
+
+.piece{
+    display: block;
+    background-color: transparent;
+    z-index: 100;
+    margin-left: auto;
+    margin-right: auto;
+    object-fit:cover;
+    height: 100%;
+}
+
+h1{
+    margin: 0;
+}

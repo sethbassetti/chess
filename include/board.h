@@ -1,10 +1,9 @@
 #include <vector>
+#include <iostream>
 #include "utils.h"
 #include "position.h"
 
 #pragma once
-
-
 
 
 
@@ -50,6 +49,8 @@ public:
     // Constructor function for board. Takes care of setting everything up.
     Board();
 
+    Board(std::string fen_string);
+
     void Test();
 
     // Chooses a move via the start and end positions and calls the make move function
@@ -59,6 +60,8 @@ public:
 
     
     void Display();
+
+    int perft(int depth);
 
     std::vector<Move> GenerateMoveList();
 
@@ -138,7 +141,7 @@ private:
     bool KingInCheck(int color);
     bool IsSquareAttacked(int square, int color);
 
-    int perft(int depth);
+
 
     void perft_test(int depth);
 

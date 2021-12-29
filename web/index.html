@@ -1,21 +1,44 @@
-<!DOCTYPE html>
-<HTML>
-    <HEAD>
-        <title>Chess</title>
-        <link rel="stylesheet" href="style.css">
-        <script src="chess.js"></script>
-    </HEAD>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <title>Spaghetti Chess</title>
+  <link rel="stylesheet" href="css/chessboard-1.0.0.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  
+<script src="js/jquery-3.6.0.js"></script>
+<script src="../a.out.js"></script>
+<script src="js/chessboard-1.0.0.min.js"></script>
+<script src="js/chess.js"></script>
 
-    <BODY onload="initGame()">
-        <div id="board">
+<script>
+    Module.onRuntimeInitialized = _ => {
+        console.log(Module.IsValidMove("1", 1, 1, 1));
+    }
+</script>
+</head>
+<body onload="initBoard()">
 
-        </div>
-        <div id="ui">
-            <h1><center>Menu Settings</center> </h1>
-            <input type="radio" id="white" name="colorSelector" value"white" checkedg>
-            <label for="white"> White</label>
-            <input type="radio" id="black" name="colorSelector" value="black">
-            <label for="black">Black</label>
-        </div>
-    </BODY>
-</HTML>
+<div id="Game">
+    <div id="board"></div>
+
+    <div id="ui">
+        <h1> <center>Game Settings</center></h1>
+        <input type="radio" name="colorSelector" id="white" value="white" checked>
+        <label for="white">White</label>
+        <input type="radio" name="colorSelector" id="black" value="black">
+        <label for="black">Black</label>
+    </br>
+        <button id="setStartBtn">Start Position</button>
+        <p></p>
+
+    </div>
+
+</div>
+
+
+
+
+</body>
+</html>

@@ -21,7 +21,7 @@ const vector<string> square_index = {"a1", "b1", "c1", "d1", "e1", "f1", "g1", "
 /* Starts the game by initializing the board and calling the play function */
 void Game::Start()
 {
-    Board game_board = Board();
+    Board game_board = Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     player_color = GetPlayerColor();
     Play();
 }

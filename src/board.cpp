@@ -11,6 +11,7 @@
 #include "board.h"
 #include "position.h"
 
+
 using namespace std;
 
 // Constructor for board, initializes board position and preset attack tables
@@ -23,6 +24,26 @@ Board::Board(){
     turn_to_move = white;
 
     // Set en passant square to 0 (indicates no en passant available)
+    en_passant_square = 0;
+
+    // Sets castling rights such that all castling is available at the start (no pieces have moved)
+    castling_rights = wk | wq | bk | bq;
+
+    // Initializes leaper attack tables, since they are independent of board position
+    InitLeaperAttacks();
+
+    // Initializes precalculated ray attack lookup tables
+    InitRayAttacks();
+
+}
+
+Board::Board(std::string fen_string){
+
+    // Builds the position based on the fen_string
+    position = Position(fen_string);
+
+    turn_to_move = white;
+
     en_passant_square = 0;
 
     // Sets castling rights such that all castling is available at the start (no pieces have moved)

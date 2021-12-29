@@ -81,7 +81,6 @@ void PrintBoard(U64 bitboard){
 
     // Prints out hexadecimal representation of the board
     printf("Hexadecimal: 0x%lxULL\n", bitboard);
-    
 }
 
 void PrintMove(Move move){

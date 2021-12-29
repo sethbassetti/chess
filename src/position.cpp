@@ -1,5 +1,7 @@
 #include <string.h>
 #include <iostream>
+#include <cctype>
+#include <algorithm>
 #include "position.h"
 
 using namespace std;
@@ -32,7 +34,39 @@ Position::Position(){
     pieces = {null, white_pawns, white_rooks, white_knights, white_bishops, white_queens, white_kings,
               black_pawns, black_rooks, black_knights, black_bishops, black_queens, black_kings};
     colors = {white_pieces, black_pieces};
-    en_passant = false;
+    
+    Update();
+}
+
+/* Initializes all piece and color bitboards to 0 and then passes them to parseFEN to populate them */
+Position::Position(std::string fen_string){
+
+    /* White pieces, black pieces, and all pieces */
+    U64 white_pieces = 0ULL;
+    U64 black_pieces = 0ULL;
+
+    /* white pieces */
+    U64 white_pawns    = 0ULL;
+    U64 white_knights  = 0ULL;
+    U64 white_bishops  = 0ULL;
+    U64 white_rooks    = 0ULL;
+    U64 white_queens   = 0ULL;
+    U64 white_kings    = 0ULL;
+
+    /* black pieces */
+    U64 black_pawns    = 0ULL;
+    U64 black_knights  = 0ULL;
+    U64 black_bishops  = 0ULL;
+    U64 black_rooks    = 0ULL;
+    U64 black_queens   = 0ULL;
+    U64 black_kings    = 0ULL;
+
+    U64 null = 0ULL;
+
+    pieces = {null, white_pawns, white_rooks, white_knights, white_bishops, white_queens, white_kings,
+              black_pawns, black_rooks, black_knights, black_bishops, black_queens, black_kings};
+    colors = {white_pieces, black_pieces};
+    ParseFEN(fen_string);
     Update();
 }
 
@@ -69,4 +103,51 @@ void Position::PrintBoard(){
     }
     // Print board file labels (A-H)
     printf("   A  B  C  D  E  F  G  H\n\n");
+}
+
+void Position::ParseFEN(std::string fen_string){
+
+    // Because FEN strings start on the 8th rank and first file and move top left to bottom right
+    int rank = 7;
+    int file = 0;
+    /* This for loop will place the pieces on the boards */
+    for (int i = 0; i < fen_string.length(); i++){
+        // Retrieves the token in the fen_string
+        char token = fen_string.at(i);
+
+        // If it is a whitespace, break out of this for loop since we are done assigning pieces
+        if(token == ' '){
+            break;
+        }
+
+        // If it is a slash, move to the next rank and reset the file
+        else if(token == '/'){
+            rank--;
+            file = 0;
+
+        // If it is a digit, skip ahead that many spaces
+        }else if(isdigit(token)){
+            int int_token = token - '0';
+            file += int_token;
+
+        // Otherwise, it is a letter, so set the piece on the bitboard
+        }else{
+            int square_index = rank * 8 + file;
+            SetPieceOnBitboard(token, square_index);
+        }
+    }
+}
+
+/* Given a character representing the piece and a square, places the piece on that square */
+void Position::SetPieceOnBitboard(char token, int square){
+    // A vector of characters that holds the same indexes as the pieces vector in the position class
+    vector<char> pieces = {'0', 'P', 'R', 'N', 'B', 'Q', 'K', 'p', 'r', 'n', 'b', 'q', 'k'};
+
+    // Finds the index of the character in the character vector 
+    auto it = std::find(pieces.begin(), pieces.end(), token);
+    int piece_index = it - pieces.begin();
+
+    // Uses the index to retrieve the piece bitboard and sets the bit corresponding to the square
+    U64 piece_table = pieces[piece_index];
+    set_bit(piece_table, square);
 }
