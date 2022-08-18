@@ -154,8 +154,7 @@ void Position::SetPieceOnBitboard(char token, int square){
 }
 
 std::string Position::GenerateFEN(){
-    int rank = 7;
-    int file = 0;
+
     std::string fen_string;
 
     // A vector of characters that holds the same indexes as the pieces vector in the position class

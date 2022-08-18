@@ -1,10 +1,10 @@
 #include <iostream>
 #include <vector>
 #include <iostream>
-#include <emscripten/bind.h>
+//#include <emscripten/bind.h>
 #include "board.h"
 
-using namespace emscripten;
+//using namespace emscripten;
 Board board;
 
 int IsValidMove(int start, int end)
@@ -33,9 +33,11 @@ void MakeAIMove(){
     board.MakeMove(moves[move_choice]);
 }
 
+/*
 EMSCRIPTEN_BINDINGS(my_module){
     emscripten::function("IsValidMove", &IsValidMove);
     emscripten::function("GetBoardPosition", &GetBoardPosition);
     emscripten::function("ResetBoard", &ResetBoard);
     emscripten::function("MakeAIMove", &MakeAIMove);
 }
+*/

@@ -88,6 +88,8 @@ enum pieceType
 // Macro that pops a bit to 0 at a particular square
 #define pop_bit(bitboard, square)(bitboard &= ~(1ULL << square))
 
+#define count_bits(bitboard) __builtin_popcountll(bitboard)
+
 // Macro that defines whether direction is negative ray direction, bases it off enum number
 #define is_negative(dir)(dir > 3)
 

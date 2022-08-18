@@ -127,10 +127,7 @@ void Board::ParseFENColorCastling(string fen_string){
 }
 /* Test function for implementing and development */
 void Board::Test(){
-    position.PrintBoard();
-    printf("%d\n", turn_to_move);
-    printf("%d\n", castling_rights);
-    printf("%d\n", en_passant_square);
+
 }
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
@@ -225,6 +222,10 @@ U64 Board::CalcKnightAttacks(int square){
 
     return attacks;
 }
+
+
+
+
 
 /* Retrieves attack tables for leaper pieces (pawn, king, knight) */
 void Board::InitLeaperAttacks(){

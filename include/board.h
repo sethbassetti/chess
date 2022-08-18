@@ -113,7 +113,13 @@ private:
     // Initializes the board and its pieces
     void InitializeBoard();
 
+    U64 MaskBishopAttacks(int square);
+    U64 MaskRookAttacks(int square);
 
+    U64 BishopAttacksOnTheFly(int square, U64 block);
+    U64 RookAttacksOnTheFly(int square, U64 block);
+
+    U64 SetOccupancy(int index, int bits_in_mask, U64 attack_map);
 
     // Initializes attack tables for different piece types. Slider(rook, queen, bishop), and leaper(king,
     // knight, and pawn)
