@@ -10,8 +10,63 @@ MoveCalc::MoveCalc()
     // Initialize the slider moves for bishops and rooks
     InitSliderMoves(bishop);
     InitSliderMoves(rook);
+    
+    // Initializes leaper move attack tables for kings and knights
+    InitLeaperMoves();
 }
 
+/* Returns a bitboard of locations a king could attack if it were on a given square */
+U64 MoveCalc::CalcKingAttacks(int square){
+    // Stores the attacks
+    U64 attacks = 0ULL;
+
+    // Stores the piece on the square
+    U64 bitboard = 0ULL;
+
+    // set piece on board
+    set_bit(bitboard, square);
+
+    // If king not on outer a file, puts attacking square one to the left
+    attacks |= (bitboard >> 1) & not_h_file;
+    // If king not on outer h file, puts attacking square one to the right
+    attacks |= (bitboard << 1) & not_a_file;
+    
+
+    /* At this point there is 1, 2, or 3 attacks in a horizontal line (depending on outer files)
+    so shift it up one and down one to obtain all directions for king */
+    bitboard |= attacks;
+    // Shift up one
+    attacks |= (bitboard << 8);
+
+    // Shift down one
+    attacks |= (bitboard >> 8);
+
+    return attacks;
+}
+
+U64 MoveCalc::CalcKnightAttacks(int square)
+{
+    // Stores the attacks
+    U64 attacks = 0ULL;
+
+    // Stores the piece on the square
+    U64 bitboard = 0ULL;
+
+    // set piece on board
+    set_bit(bitboard, square);
+
+    // Calculates all possible knight attacks, intersects with files to avoid wrapping
+    attacks |= (bitboard << 17) & not_a_file;   // NNE attacks
+    attacks |= (bitboard << 10) & not_ab_file;  // NEE attacks
+    attacks |= (bitboard >> 6) & not_ab_file;   // SEE attacks
+    attacks |= (bitboard >> 15) & not_a_file;   // SSE attacks
+    attacks |= (bitboard >> 17) & not_h_file;   // SSW attacks
+    attacks |= (bitboard >> 10) & not_gh_file;  // SWW attacks
+    attacks |= (bitboard << 6) & not_gh_file;   // NWW attacks
+    attacks |= (bitboard << 15) & not_h_file;   // NNW attacks
+
+    return attacks;
+}
 
 /* Mask bishop attacks for magic bitboard */
 U64 MoveCalc::MaskBishopAttacks(int square)
@@ -300,6 +355,16 @@ void MoveCalc::InitSliderMoves(int bishop)
     }
 }
 
+void MoveCalc::InitLeaperMoves()
+{
+    // initialize attack tables for knights and kings for every square
+    for (int square = 0; square < 64; square++)
+    {
+        king_attacks[square] = CalcKingAttacks(square);
+        knight_attacks[square] = CalcKnightAttacks(square);
+    }
+}
+
 /* Uses magic bitboard technique to get bishop attacks */
 U64 MoveCalc::GetBishopAttacks(int square, U64 occupancy)
 { 
@@ -330,4 +395,20 @@ U64 MoveCalc::GetRookAttacks(int square, U64 occupancy)
 
     return rook_attacks[square][occupancy];
 
+}
+
+/* Uses the union of rook and bishop attacks to construct a queen attack */
+U64 MoveCalc::GetQueenAttacks(int square, U64 occupancy)
+{
+    return GetRookAttacks(square, occupancy) | GetBishopAttacks(square, occupancy);
+}
+
+U64 MoveCalc::GetKingAttacks(int square)
+{
+    return king_attacks[square];
+}
+
+U64 MoveCalc::GetKnightAttacks(int square)
+{
+    return knight_attacks[square];
 }

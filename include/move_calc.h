@@ -14,8 +14,13 @@ public:
     // Given a square and an occupancy bitboard, retrieves the slider attack map for that piece
     U64 GetBishopAttacks(int square, U64 occupancy);
     U64 GetRookAttacks(int square, U64 occupancy);
+    U64 GetQueenAttacks(int square, U64 occupancy);
+
+    // Given a square, will return the leaper attack map for that piece
+    U64 GetKingAttacks(int square);
+    U64 GetKnightAttacks(int square);
         
-    // Initializes a list of magic numbers
+    // Initializes a list of magic numbers to be used in the program
     void InitMagicNumbers(int bishop);
 
 
@@ -115,70 +120,70 @@ private:
     };
 
     const U64 bishop_magic_numbers[64] = {
-            0x1140011802009025ULL,
-            0x3148080800604800ULL,
-            0x48020062040021ULL,
-            0x88084100008000ULL,
-            0x1104002080013ULL,
-            0x131844022027408aULL,
-            0x1004210110116020ULL,
-            0x21082802080408ULL,
-            0x4912021010a08ULL,
-            0x4040108211500ULL,
-            0x1100104c10822804ULL,
-            0xe00080851009040ULL,
-            0x200111040202420ULL,
-            0x8008260201080ULL,
-            0x2022010c30040500ULL,
-            0x8e812c01141013ULL,
-            0x408102002048800ULL,
-            0x20901001410901ULL,
-            0x150000204224102ULL,
-            0x29200e411220002ULL,
-            0x22000404a20000ULL,
-            0x230022008201c0ULL,
-            0x400108021000ULL,
-            0x482060020842404ULL,
-            0x7e10000a204840ULL,
-            0x5a23000022ca804ULL,
-            0x1408010042020200ULL,
-            0x21a4010208200880ULL,
-            0x81040012002101ULL,
-            0x4109060019089001ULL,
-            0x84809104060806ULL,
-            0x490206808813ULL,
-            0x2084100600280ULL,
-            0x2240120008802d1ULL,
-            0x40280400280020ULL,
-            0x40400180211ULL,
-            0x200404040440100ULL,
-            0x2020008022010400ULL,
-            0x8408408811100ULL,
-            0x144410a008400ULL,
-            0x4084024250984080ULL,
-            0x208e208152004ULL,
-            0x286010048008100ULL,
-            0x1100024010400201ULL,
-            0x48200e0c000082ULL,
-            0x6844011801098600ULL,
-            0x2108200880200ULL,
-            0x2814210401040031ULL,
-            0x6480848080200ULL,
-            0x203100490420a450ULL,
-            0x4021110c01042100ULL,
-            0x80120108482810ULL,
-            0x88020420821480ULL,
-            0x200102001410000ULL,
-            0x2040050802005200ULL,
-            0x828842089600a0ULL,
-            0x300610118202220ULL,
-            0x100200524c042000ULL,
-            0x2426000842009003ULL,
-            0x8903161420a800ULL,
-            0x2003102004050402ULL,
-            0x800843180a01ULL,
-            0x4020084308080110ULL,
-            0x1840040400404100ULL
+        0x1140011802009025ULL,
+        0x3148080800604800ULL,
+        0x48020062040021ULL,
+        0x88084100008000ULL,
+        0x1104002080013ULL,
+        0x131844022027408aULL,
+        0x1004210110116020ULL,
+        0x21082802080408ULL,
+        0x4912021010a08ULL,
+        0x4040108211500ULL,
+        0x1100104c10822804ULL,
+        0xe00080851009040ULL,
+        0x200111040202420ULL,
+        0x8008260201080ULL,
+        0x2022010c30040500ULL,
+        0x8e812c01141013ULL,
+        0x408102002048800ULL,
+        0x20901001410901ULL,
+        0x150000204224102ULL,
+        0x29200e411220002ULL,
+        0x22000404a20000ULL,
+        0x230022008201c0ULL,
+        0x400108021000ULL,
+        0x482060020842404ULL,
+        0x7e10000a204840ULL,
+        0x5a23000022ca804ULL,
+        0x1408010042020200ULL,
+        0x21a4010208200880ULL,
+        0x81040012002101ULL,
+        0x4109060019089001ULL,
+        0x84809104060806ULL,
+        0x490206808813ULL,
+        0x2084100600280ULL,
+        0x2240120008802d1ULL,
+        0x40280400280020ULL,
+        0x40400180211ULL,
+        0x200404040440100ULL,
+        0x2020008022010400ULL,
+        0x8408408811100ULL,
+        0x144410a008400ULL,
+        0x4084024250984080ULL,
+        0x208e208152004ULL,
+        0x286010048008100ULL,
+        0x1100024010400201ULL,
+        0x48200e0c000082ULL,
+        0x6844011801098600ULL,
+        0x2108200880200ULL,
+        0x2814210401040031ULL,
+        0x6480848080200ULL,
+        0x203100490420a450ULL,
+        0x4021110c01042100ULL,
+        0x80120108482810ULL,
+        0x88020420821480ULL,
+        0x200102001410000ULL,
+        0x2040050802005200ULL,
+        0x828842089600a0ULL,
+        0x300610118202220ULL,
+        0x100200524c042000ULL,
+        0x2426000842009003ULL,
+        0x8903161420a800ULL,
+        0x2003102004050402ULL,
+        0x800843180a01ULL,
+        0x4020084308080110ULL,
+        0x1840040400404100ULL
     };
 
     // Contains possible rook and bishop attacks (excluding blockers) for all squares
@@ -188,6 +193,11 @@ private:
     // Contains pre-initialized tables for all possible rook/bishop attacks on given squares
     U64 rook_attacks    [64][4096];
     U64 bishop_attacks  [64][512];
+
+
+    // Pre calculated knight and king attack tables
+    U64 knight_attacks[64];
+    U64 king_attacks[64];
 
     // Precalculated pawn attack tables [side][square]
     U64 pawn_attacks[2][64];
@@ -208,7 +218,14 @@ private:
     // Pre-calculates rook and bishop attack tables
     void InitSliderMoves(int bishop);
 
+    // Pre calculates knight and rook moves
+    void InitLeaperMoves();
 
+    // Given a square, calculates where the king could attack
+    U64 CalcKingAttacks(int square);
+
+    // Given a square, calculates where the knight could attack
+    U64 CalcKnightAttacks(int square);
 
     U64 FindMagicNumber(int square, int relevant_bits, int bishop);
 };

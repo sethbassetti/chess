@@ -2,12 +2,14 @@
 #include <iostream>
 #include <stdio.h>
 #include <bitset>
+#include <bits/stdc++.h>
 #include <strings.h>
 #include <string.h>
 #include <assert.h>  
 #include <ctime>
 #include <vector>
 #include <algorithm>
+
 #include "utils.h"
 #include "board.h"
 #include "position.h"
@@ -16,79 +18,119 @@
 using namespace std;
 
 
-// Constructor for board, initializes board position and preset attack tables
+// Constructor for board, initializes board position and game state (en passant, castling, etc...)
 Board::Board(){
-    // Constructs a position object that holds information about piece positions, sets up initial board position
-    position = Position();
+
+    // Initialize the starting position on the board via the piece bitboards
+    /* white pieces */
+    pieces[P]   = 0xFF00LLU;    // white pawns
+    pieces[N]   = 0x42LLU;      // white knights
+    pieces[B]   = 0x24LLU;      // white bishops
+    pieces[R]   = 0x81LLU;      // white rooks
+    pieces[Q]   = 0x8LLU;       // white queen
+    pieces[K]   = 0x10LLU;      // white king
+
+    /* black pieces */
+    pieces[p]   = 0xFF000000000000LLU;      // black pawns
+    pieces[n]   = 0x4200000000000000LLU;    // black knights
+    pieces[b]   = 0x2400000000000000LLU;    // black bishops
+    pieces[r]   = 0x8100000000000000LLU;    // black rooks
+    pieces[q]   = 0x800000000000000LLU;     // black queen
+    pieces[k]   = 0x1000000000000000LLU;    // black king
+
+    /* Define starting occupancies for both sides */
+    occupancies[white] = 0xFFFFULL;
+    occupancies[black] = 0xFFFF000000000000LLU;
+    occupancies[both] = occupancies[white] | occupancies[black];
 
     // Sets white as the first turn
     turn_to_move = white;
 
     // Set en passant square to 0 (indicates no en passant available)
-    en_passant_square = 0;
+    enpassant = no_sq;
 
     // Sets castling rights such that all castling is available at the start (no pieces have moved)
     castling_rights = wk | wq | bk | bq;
-
-    // Initializes leaper attack tables, since they are independent of board position
-    InitLeaperAttacks();
-
-    // Initializes precalculated ray attack lookup tables
-    InitRayAttacks();
-
 }
 
-Board::Board(std::string fen_string){
+/* Given some fen string, this function will initialize a board based on that string, set the board position and set
+en passant/castling rights */
+Board::Board(string fen_string){
 
-    // Builds the position based on the fen_string
-    position = Position(fen_string);
+    // Initialize the piece and occupancy bitboards as empty as empty
+    for (int i = 0; i < 12; i++)    pieces[i] = 0ULL;
+    for (int i = 0; i< 3; i++)      occupancies[i] = 0ULL;
 
-    ParseFENColorCastling(fen_string);
+    // Initializes the castling rights as 0
+    castling_rights = 0;
 
-    // Initializes leaper attack tables, since they are independent of board position
-    InitLeaperAttacks();
+    // Initialize no en passant square
+    enpassant = no_sq;
 
-    // Initializes precalculated ray attack lookup tables
-    InitRayAttacks();
-}
+    // A string to find which piece in the FEN string corresponds to which bitboard
+    string piece_tokens = "PNBRQKpnbrqk";
 
-void Board::ParseFENColorCastling(string fen_string){
-    char *token;
+    // Because FEN strings start on the 8th rank and first file and move top left to bottom right
+    int rank = 7;
+    int file = 0;
 
-    // Copies the fen_string variable into a char array to work with easier
-    char char_fen[fen_string.size() + 1];
-    fen_string.copy(char_fen, fen_string.size() + 1);
-    char_fen[fen_string.size()] = '\0';
+    /* Iterate over the FEN string assigning all the pieces to the board */
+    for (unsigned int i = 0; i < fen_string.length(); i++){
 
-    // Gets the first segment of the FEN
-    token = strtok(char_fen, " ");
+        // Retrieves the token in the fen_string
+        char token = fen_string.at(i);
 
-    // Gets the second segment of the FEN
-    token = strtok(NULL, " ");
+        int square_index = rank * 8 + file;
 
-    // Determines the current turn
-    if(strcmp(token, "w") == 0){
-        turn_to_move = white;
-    }else{
-        turn_to_move = black;
+        // If it is a whitespace, break out of this for loop since we are done assigning pieces
+        if(token == ' '){
+            break;
+        }
+
+        // If it is a slash, move to the next rank and reset the file
+        else if(token == '/'){
+            rank--;
+            file = 0;
+
+        // If it is a digit, skip ahead that many spaces
+        }else if(isdigit(token)){
+            int int_token = token - '0';
+            file += int_token;
+
+        // Otherwise, it is a letter, so set the piece on the bitboard
+        }else{
+
+            // Iterate over the piece tokens string 
+            for (unsigned int i = 0; i < piece_tokens.length(); i++)
+            {   
+                // If the token in the FEN string matches the piece token, assign a bit to the appropriate piece bitboard
+                if (token == piece_tokens[i]) set_bit(pieces[i], square_index);
+            }
+
+            // Increment the file variable by 1
+            file += 1;
+        }
     }
 
-    // Determines the castling rights
-    token = strtok(NULL, " ");
-    
-    // Copies the token to a string for easier iteration
-    string castling_right_string;
-    castling_right_string.append(token);
-    
-    // Sets castling rights to 0 at first and then builds them up
-    castling_rights = 0;
-    
+    // Creates a stringstream that splits the FEN string up by spaces
+    stringstream fen_split(fen_string);
 
-    // Iterates over each character in the string
-    for (unsigned int i = 0; i < castling_right_string.size(); i++){
-        
-        // Otherwise, look at each character and assign appropriate castling rights
-        switch(castling_right_string.at(i)){
+    // The field will contain a current field from the FEN String
+    string field;
+
+    fen_split >> field; // Pushes the piece positions into field
+    fen_split >> field; // Pushes the active color into field
+
+    // Sets the active color based on the FEN string
+    turn_to_move = (field == "w") ? white : black;
+
+    fen_split >> field; // Pushes the castling rights into field
+
+    // Iterates through each token in the castling rights
+    for (char token : field)
+    {
+        // Depending on which token exists, add to the castling rights variable
+        switch(token){
             case 'K':
                 castling_rights |= wk;
                 break;
@@ -104,31 +146,17 @@ void Board::ParseFENColorCastling(string fen_string){
             }
     }
 
-    // Determine en passant square
-    token = strtok(NULL, " ");
-    
-    // If character is a dash, no en passant is available
-    if(token[0] == '-'){
-        en_passant_square = 0;
-    
-    // Otherwise, set the en passant square
-    }else{
-        // Converting the token into a string for easy iteration
-        string en_passant_square_string;
-        en_passant_square_string.append(token);
+    fen_split >> field; // Pushes the en passant info into the field
 
-        // Finds the index of the square in the square_index table
-        auto it = std::find(square_index.begin(), square_index.end(), en_passant_square_string);
-        int square_index_num = it - square_index.begin();
+    // Iterates through every square
+    for (int i = 0; i < 64; i++){
 
-        // Sets the ne passant square to that number
-        en_passant_square = square_index_num;
+        // If the en passant field variable is the value of some square on the board, set the en passant square to that value
+        if (square_index[i] == field) enpassant = i;
     }
-}
-/* Test function for implementing and development */
-void Board::Test(){
 
 }
+
 
 /* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
 could attack*/
@@ -171,291 +199,7 @@ U64 Board::CalcPawnAttacks(int side, int square){
     return attacks;
 }
 
-/* Returns a bitboard of locations a king could attack if it were on a given square */
-U64 Board::CalcKingAttacks(int square){
-    // Stores the attacks
-    U64 attacks = 0ULL;
 
-    // Stores the piece on the square
-    U64 bitboard = 0ULL;
-
-    // set piece on board
-    set_bit(bitboard, square);
-
-    // If king not on outer a file, puts attacking square one to the left
-    attacks |= (bitboard >> 1) & not_h_file;
-    // If king not on outer h file, puts attacking square one to the right
-    attacks |= (bitboard << 1) & not_a_file;
-    
-
-    /* At this point there is 1, 2, or 3 attacks in a horizontal line (depending on outer files)
-    so shift it up one and down one to obtain all directions for king */
-    bitboard |= attacks;
-    // Shift up one
-    attacks |= (bitboard << 8);
-
-    // Shift down one
-    attacks |= (bitboard >> 8);
-
-    return attacks;
-}
-
-U64 Board::CalcKnightAttacks(int square){
-    // Stores the attacks
-    U64 attacks = 0ULL;
-
-    // Stores the piece on the square
-    U64 bitboard = 0ULL;
-
-    // set piece on board
-    set_bit(bitboard, square);
-
-    // Calculates all possible knight attacks, intersects with files to avoid wrapping
-    attacks |= (bitboard << 17) & not_a_file;   // NNE attacks
-    attacks |= (bitboard << 10) & not_ab_file;  // NEE attacks
-    attacks |= (bitboard >> 6) & not_ab_file;   // SEE attacks
-    attacks |= (bitboard >> 15) & not_a_file;   // SSE attacks
-    attacks |= (bitboard >> 17) & not_h_file;   // SSW attacks
-    attacks |= (bitboard >> 10) & not_gh_file;  // SWW attacks
-    attacks |= (bitboard << 6) & not_gh_file;   // NWW attacks
-    attacks |= (bitboard << 15) & not_h_file;   // NNW attacks
-
-    return attacks;
-}
-
-
-
-
-
-/* Retrieves attack tables for leaper pieces (pawn, king, knight) */
-void Board::InitLeaperAttacks(){
-    /* Constructs leaper attack tables for every square, so iterates through rank and file */
-    for (int rank = 0; rank < 8; rank++){
-        for (int file = 0; file < 8; file++){
-
-            // Gets square index
-            int square = rank * 8 + file;
-
-            // Pawn attacks are dependent on their color, all other attacks are color agnostic
-            pawn_attacks[white][square] = CalcPawnAttacks(white, square);
-            pawn_attacks[black][square] = CalcPawnAttacks(black, square);
-            king_attacks[square] = CalcKingAttacks(square);
-            knight_attacks[square] = CalcKnightAttacks(square);
-        }
-    }
-}
-
-/* Initialize Ray Attack table. Constructs north, south, east, and west ray attacks (occupancy agnostic)
-for every square on the board */
-void Board::InitRayAttacks(){
-    // North ray is a line of ones extending northwards from (but not including) a1
-    U64 north = 0x0101010101010100ULL;
-  
-    //  Left shifts 1 bit each time for every square, constructing the north ray attack table
-    for (int sq = 0; sq < 64; sq++, north <<=1){
-        ray_attacks[sq][Nort] = north;
-    }
-
-    // A line of ones extending southwards from (but not including) h8
-    U64 south = 0x0080808080808080ULL;
-
-    // Right shifts one bit each time for every square to construct the south attack table
-    for (int sq = 63; sq >= 0; sq--, south >>= 1)
-    {
-        ray_attacks[sq][Sout] = south;
-    }
-
-    // A line of ones extending eastwards from, but not including, a1
-    U64 east = 0xfeULL;
-
-    // Iterates through rank and file respectively. For every rank, copies the east bitboard to new_east
-    // and left shifts new_east for every file. To avoid file wrapping, new_east is intersected with the original
-    // east bitboard so only ones on the original rank remain. Every rank, the original east bitboard is
-    // shifted up a rank (leftshift of 8)
-    for (int rank = 0; rank < 8; rank++, east <<= 8)
-    {
-        U64 new_east = east;
-        for (int file = 0; file < 8; file += 1, new_east <<= 1)
-        {
-            ray_attacks[rank * 8 + file][East] = east & new_east;
-        }
-    }
-
-    // A line of ones extending westwards from, but not including, h8
-    U64 west = 0x7f00000000000000ULL;
-
-    // Performs the same process as calculating the east ray attacks, but in reverse. Starts in top rank
-    // and last file, and works its way downwards from h8 to a1.
-    for (int rank = 7; rank >= 0; rank--, west >>= 8)
-    {
-        U64 new_west = west;
-        for (int file = 7; file >= 0; file --, new_west >>= 1)
-        {
-            ray_attacks[rank * 8 + file][West] = west & new_west;
-        }
-    }
-
-    // A line of ones extending northeastwards from a1
-    U64 noea = 0x8040201008040200ULL;
-    
-    // Iterates through every rank and file. Starts with a mask in the a_file, that is unioned
-    // with itself shifted one for every file. The negation of this is intersected with the original ray
-    // attack to prevent wrapping around.
-    for (int rank = 0; rank < 8; rank++){
-        U64 wrap_mask = not_a_file;
-        for (int file = 0; file < 8; file++, noea <<= 1, wrap_mask&= wrap_mask << 1)
-        {
-            ray_attacks[rank * 8 + file][NoEa] = noea & wrap_mask;
-        }
-    }
-
-    U64 nowe = 0x102040810204000ULL;
-    U64 rank_nowe = nowe;
-
-    for (int rank = 0; rank < 8; rank++)
-    {
-        rank_nowe = nowe << (8 * rank);
-
-        U64 wrap_mask = not_h_file;
-        for (int file = 7; file >= 0; file--, rank_nowe >>= 1, wrap_mask &= wrap_mask >> 1)
-        {
-            int square = rank * 8 + file;
-            //printf("%d\n", square);
-            ray_attacks[square][NoWe] = rank_nowe & wrap_mask;
-        }
-    }
-
-    U64 soea = 0x2040810204080ULL;
-    U64 rank_soea;
-    for (int rank = 7; rank >= 0; rank--)
-    {
-        U64 wrap_mask = not_a_file;
-        rank_soea = soea >> ((7 - rank) * 8);
-        for (int file = 0; file < 8; file++, rank_soea <<= 1, wrap_mask &= wrap_mask << 1)
-        {
-            int square = rank * 8 + file;
-            ray_attacks[square][SoEa] = rank_soea & wrap_mask;
-        }
-    }
-
-    U64 sowe = 0x40201008040201ULL;
-    for (int rank = 7; rank >= 0; rank--){
-        U64 wrap_mask = not_h_file;
-        for (int file = 7; file >= 0; file--, sowe >>= 1, wrap_mask &= wrap_mask >> 1)
-        {
-            int square = rank*8 + file;
-            ray_attacks[square][SoWe] = sowe & wrap_mask;
-        }
-    }
-}
-
-/* Calculates sliding attack sets for rooks given square parameter */
-U64 Board::CalcRookAttacks(int square){
-    // Stores the attacks
-    U64 attacks = 0ULL;
-
-    // Stores the piece on the square
-    U64 bitboard = 0ULL;
-
-    // set piece on board
-    set_bit(bitboard, square);
-
-    // Creates a vector of the rays to construct the attacks from
-    enumDirections dirs[4] = {Nort, East, West, Sout};
-
-    // Iterates over every direction to construct attack table
-    for (int i = 0; i < 4; i++){
-        
-        // Assigns the current direction to dir
-        enumDirections dir = dirs[i];
-        
-        // Gets the appropriate ray attack for the direction and square
-        U64 ray_attack = GetDirRayAttacks(dir, square);
-
-        // Adds the ray attack to the overall attacks table with a union
-        attacks |= ray_attack;
-    }
-
-    return attacks;
-}
-
-U64 Board::CalcBishopAttacks(int square){
-    // Stores the attacks
-    U64 attacks = 0ULL;
-
-    // Stores the piece on the square
-    U64 bitboard = 0ULL;
-
-    // set piece on board
-    set_bit(bitboard, square);
-
-    // Creates a vector of the rays to construct the attacks from
-    enumDirections dirs[4] = {NoWe, SoWe, SoEa, NoEa};
-
-    // Iterates over every direction to construct attack table
-    for (int i = 0; i < 4; i++){
-        
-        // Assigns the current direction to dir
-        enumDirections dir = dirs[i];
-        
-        // Gets the appropriate ray attack for the direction and square
-        U64 ray_attack = GetDirRayAttacks(dir, square);
-   
-        // Adds the ray attack to the overall attacks table with a union
-        attacks |= ray_attack;
-    }
-
-    return attacks;
-}
-
-/* Unions the rook and bishop attacks to form queen attack table. NOTE: This function HAS to be called after
-the rook and bishop attack tables are built or it will construct the empty set */
-U64 Board::CalcQueenAttacks(int square){
-    return rook_attacks[square] | bishop_attacks[square];
-}
-/* Returns the ray attack in a given direction (N, NW, S, SE, etc...) from the given square.
-This function considers blocker pieces. Thus, the ray attacks only go as far as line of sight from the
-square allows */
-U64 Board::GetDirRayAttacks(enumDirections dir, int square){
-
-    // Retrieves ray attacks from lookup table
-    U64 ray_attack = ray_attacks[square][dir];
-
-    // Calculates every piece that ray can hit with intersection of ray attack and occupancy    
-    U64 blocker = ray_attack & position.occupancy;
-
-    // If there is a blocker, make sure ray attack cannot go through that square
-    if(blocker){
-        // Gets the index of the first piece the ray attack would hit
-        int index = BitScan(blocker, is_negative(dir));
-
-        // Does an XOR to calculate the ray attack UP TO the first piece it hits and no further. 
-        // This works by looking up what the ray would be at the first blocker and then simply XORing
-        // to get the original ray minus the ray from the blocker square
-        ray_attack ^= ray_attacks[index][dir];
-    }
-
-    return ray_attack;
-}
-
-
-
-/* Retrieves attack tables for slider pieces (bishop, rook, queen) */
-void Board::InitSliderAttacks(){
-
-    
-
-    // Constructs rook attack table for every square on board
-    for (int rank = 0; rank < 8; rank++)
-    {
-        for (int file = 0; file < 8; file++){
-            int square = rank * 8 + file;
-            rook_attacks[square] = CalcRookAttacks(square);
-            bishop_attacks[square] = CalcBishopAttacks(square);
-            queen_attacks[square] = CalcQueenAttacks(square);
-        }
-    }
-}
 
 /* Given a color and reference to a move list, populates the move list
 with all pawn moves of the given color */
@@ -506,7 +250,7 @@ void Board::GeneratePawnMoves(vector<Move> &moves){
                             }
                             moves.push_back(move);
                         }
-                        if (target == en_passant_square)
+                        if (target == enpassant)
                         {
                             int offset = (turn_to_move == white) ? -8 : 8;
                             int captured_piece = position.GetPieceType(target + offset);
@@ -637,7 +381,6 @@ void Board::GenerateSliderMoves(vector<Move> &move_list){
     vector<int> queen_index = SerializeBitboard(queens);
     vector<int> rook_index = SerializeBitboard(rooks);
     vector<int> bishop_index = SerializeBitboard(bishops);
-    InitSliderAttacks();
 
     FillMoveList(queen_index, queen_attacks, move_list);
     FillMoveList(rook_index, rook_attacks, move_list);
@@ -723,7 +466,7 @@ At the end of the function, it resets the board's position object to reflect the
 void Board::MakeMove(Move move){
 
     // Before making the move, store the board's game state so that this move can be unmade
-    gameState state = {position, castling_rights, en_passant_square};
+    gameState state = {position, castling_rights, enpassant};
 
     // Stores the slider attacks so InitSliderAttacks() does not have to be called on unmake move
     memcpy(state.queen_attacks, queen_attacks, sizeof(queen_attacks));
@@ -761,11 +504,11 @@ void Board::MakeMove(Move move){
 
     // If this move is a double pawn push, set the en passant square
     if(move.move_type == double_pawn_push){
-        en_passant_square = (move.start + move.end) / 2;
+        enpassant = (move.start + move.end) / 2;
 
     // If it is not a double pawn push, reset the en passant square
     }else{
-        en_passant_square = 0;
+        enpassant = 0;
     }
 
     // If this move is a castle, determine what kind of castle, move the appropriate rook, and adjust castling rights
@@ -817,7 +560,6 @@ void Board::MakeMove(Move move){
 
     // Updates the position pieces
     position.Update();
-    InitSliderAttacks();
     // Switches whose turn it is to play
     ToggleMove();
 }
@@ -846,7 +588,7 @@ void Board::UnMakeMove(Move move)
     memcpy(queen_attacks, prev_state.queen_attacks, sizeof(queen_attacks));
     memcpy(rook_attacks, prev_state.rook_attacks, sizeof(rook_attacks));
     memcpy(bishop_attacks, prev_state.bishop_attacks, sizeof(bishop_attacks));
-    en_passant_square = prev_state.en_passant_square;
+    enpassant = prev_state.en_passant_square;
     position = prev_state.position;
     ToggleMove();
 }
@@ -939,8 +681,60 @@ void Board::ToggleMove(){
     turn_to_move ^= 1;
 }
 
+/* Displays the board in ASCII format */
 void Board::Display(){
-    position.PrintBoard();
+
+    // ASCII characters for all of the board pieces
+    string ascii[12] = {"♙", "♘", "♗", "♖", "♕", "♔", "♟", "♞", "♝", "♜", "♛", "♚"};
+
+    // Iterate over every rank
+    for (int rank = 7; rank >= 0; rank--)
+    {
+        // Print the rank and a space
+        cout << rank + 1 << "  ";
+
+        // Go through every file
+        for (int file = 0; file < 8; file++){
+
+            // Init the square
+            int square = rank * 8 + file;
+
+            // Initialize the piece as -1 (indicates a blank)
+            int piece = -1;
+
+            // Checks to see if there is a piece on this square
+            for (int bb_piece=P; bb_piece <= k; bb_piece++)
+            {
+                // If one of the bitboards has a piece on that square, set the piece to the appropriate one
+                if (get_bit(pieces[bb_piece], square)) piece = bb_piece;
+            }
+
+            // If the piece is -1 just print out a dot, otherwise print out the ASCII for the piece
+            string piece_str = (piece == -1) ? "." : ascii[piece];
+            cout << ascii[piece] << "  ";
+        }
+        
+        // Print a new rank
+        printf("\n");
+    }
+    // Print board file labels (A-H)
+    printf("   A  B  C  D  E  F  G  H\n\n");
+
+    // Prints the current player's turn
+    printf("Side to move:\t%s\n", turn_to_move ? "black" : "white");
+
+    // Retrieves the en passant square (if that is possible) and prints it out
+    cout << "En passant:\t" << ((enpassant == no_sq) ? "No" : square_index[enpassant]) << endl;
+
+    // Checks each castling right and prints out that side can castle if they can
+    cout << "Castling:\t" <<
+                                 ((castling_rights & wk) ? "wk | " : "") << 
+                                 ((castling_rights & wq) ? "wq | " : "") <<
+                                 ((castling_rights & bk) ? "bk | " : "") <<
+                                 ((castling_rights & bq) ? "bq" : "") <<
+                                 endl;
+
+
 }
 
 int Board::GetCurrentPlayer(){

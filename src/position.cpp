@@ -88,56 +88,9 @@ int Position::GetPieceType(int index){
     return 0;
 }
 
-void Position::PrintBoard(){
-    string ascii[13] = {".", "\u2659", "\u2656", "\u2658", "\u2657", "\u2655", "\u2654", "\u265F", "\u265C",
-                      "\u265E", "\u265D", "\u265B", "\u265A"};
-    for (int rank = 7; rank >= 0; rank--)
-    {
-        cout << rank + 1 << "  ";
-        for (int file = 0; file < 8; file++){
-            int square = rank * 8 + file;
-            int piece_type = GetPieceType(square);
-
-            cout << ascii[piece_type] << "  ";
-        }
-        printf("\n");
-    }
-    // Print board file labels (A-H)
-    printf("   A  B  C  D  E  F  G  H\n\n");
-}
-
 void Position::ParseFEN(std::string fen_string){
 
-    // Because FEN strings start on the 8th rank and first file and move top left to bottom right
-    int rank = 7;
-    int file = 0;
-    /* This for loop will place the pieces on the boards */
-    for (unsigned int i = 0; i < fen_string.length(); i++){
-        // Retrieves the token in the fen_string
-        char token = fen_string.at(i);
-        int square_index = rank * 8 + file;
-
-        // If it is a whitespace, break out of this for loop since we are done assigning pieces
-        if(token == ' '){
-            break;
-        }
-
-        // If it is a slash, move to the next rank and reset the file
-        else if(token == '/'){
-            rank--;
-            file = 0;
-
-        // If it is a digit, skip ahead that many spaces
-        }else if(isdigit(token)){
-            int int_token = token - '0';
-            file += int_token;
-
-        // Otherwise, it is a letter, so set the piece on the bitboard
-        }else{
-            SetPieceOnBitboard(token, square_index);
-            file += 1;
-        }
-    }
+    
 }
 
 /* Given a character representing the piece and a square, places the piece on that square */
