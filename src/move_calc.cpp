@@ -6,8 +6,10 @@
 
 /* Constructor for MoveCalculator class. Initializes all pre-calculated attack tables */
 MoveCalc::MoveCalc()
-{
-    InitSliderMoves();
+{   
+    // Initialize the slider moves for bishops and rooks
+    InitSliderMoves(bishop);
+    InitSliderMoves(rook);
 }
 
 
@@ -176,7 +178,7 @@ U64 MoveCalc::SetOccupancy(int index, int bits_in_mask, U64 attack_map)
     return occupancy_map;
 }
 
-
+/* For a given square, tests many magic numbers to find one that works */
 U64 MoveCalc::FindMagicNumber(int square, int relevant_bits, int bishop)
 {
     // init occupancies (every different combination of occupied pieces, up to 4096 for a rook, 512 for a bishop)
@@ -246,73 +248,86 @@ U64 MoveCalc::FindMagicNumber(int square, int relevant_bits, int bishop)
     return 0ULL;
 }
 
-void MoveCalc::InitMagicNumbers()
-{
-    for (int rank=0; rank < 8; rank++){
-
-        for (int file=0; file<8; file++)
-        {
-            int square = rank * 8 + file;
-            int relevant_bits = bishop_relevant_bits[square];
-            U64 magic_number = FindMagicNumber(square, relevant_bits, bishop);
-            printf("%10d, ",(int) magic_number);
-        }
-        printf("\n");
-    }
-}
-
-void MoveCalc::InitSliderMasks()
+/* Print out a list of magic numbers for each square on the board */
+void MoveCalc::InitMagicNumbers(int bishop)
 {
     for (int square=0; square < 64; square++)
     {
-        rook_attack_masks[square] = MaskRookAttacks(square);
-        bishop_attack_masks[square] = MaskBishopAttacks(square);
+        // Retrieves the correct number of relevant bits and finds the magic number
+        int relevant_bits = bishop ? bishop_relevant_bits[square] : rook_relevant_bits[square];
+        U64 magic_number = FindMagicNumber(square, relevant_bits, bishop);
+
+        // Prints out the magic number as a hexadecimal
+        printf("0x%lxULL,\n",magic_number);
     }
 }
+
 /* Iterates through every square and index to construct all possible slider moves */
-void MoveCalc::InitSliderMoves()
+void MoveCalc::InitSliderMoves(int bishop)
 {   
-
-    // Populate rook and bishop attack mask tables
-    InitSliderMasks();
-
-
     // Constructs attacks for each square
     for(int square=0; square < 64; square++){
 
+        // init mask tables
+        rook_masks[square] = MaskRookAttacks(square);
+        bishop_masks[square] = MaskBishopAttacks(square);
+
         // Retrieve the appropriate sliding piece attack map
+        U64 attack_mask = bishop ? bishop_masks[square] : rook_masks[square];
 
-        U64 rook_attack_mask = rook_attack_masks[square];
-        U64 bishop_attack_mask = bishop_attack_masks[square];
-
-        // How many bits could represent blocking pieces (up to 12)
-        int rook_occupancy_bits = rook_relevant_bits[square];
-        int bishop_occupancy_bits = bishop_relevant_bits[square];
+        // Init relevant occupancy bit count and occupancy indices
+        int relevant_bits = count_bits(attack_mask);
+        int occupancy_indices = 1 << relevant_bits;
 
         // Populate the rook attack table for each possible combination of blocking pieces
-        for(int index=0; index < 4096; index++)
+        for(int index=0; index < occupancy_indices; index++)
         {
             // Construct a potential map of blockers
-            U64 occupancy = SetOccupancy(index, rook_occupancy_bits, rook_attack_mask);
+            U64 occupancy = SetOccupancy(index, relevant_bits, attack_mask);
+            if(bishop){
 
-            // Generate the rook attacks
-            U64 attack = RookAttacksOnTheFly(square, occupancy);
-
-            // Store it in the attack table
-            rook_attacks[square][index] = attack;
-        }
-
-        // Populate the bishop attack table for each possible combination of blocking pieces
-        for(int index=0; index < 512; index++)
-        {
-            // Construct a potential map of blockers
-            U64 occupancy = SetOccupancy(index, bishop_occupancy_bits, bishop_attack_mask);
-
-            // Generate the bishop attacks
-            U64 attack = BishopAttacksOnTheFly(square, occupancy);
-
-            // Store it in the attack table
-            bishop_attacks[square][index] = attack;
+                // Generate the magic index and use it to populate the bishop attack table
+                int magic_index = (occupancy * bishop_magic_numbers[square]) >> (64 - bishop_relevant_bits[square]);
+                bishop_attacks[square][magic_index] = BishopAttacksOnTheFly(square, occupancy);
+            }
+            else
+            {   
+                // Generate the magic index and use it to populate the rook attack table
+                int magic_index = (occupancy * rook_magic_numbers[square]) >> (64 - rook_relevant_bits[square]);
+                rook_attacks[square][magic_index] = RookAttacksOnTheFly(square, occupancy);
+            }
         }
     }
+}
+
+/* Uses magic bitboard technique to get bishop attacks */
+U64 MoveCalc::GetBishopAttacks(int square, U64 occupancy)
+{ 
+    // Generates relevant blockers
+    occupancy &= bishop_masks[square];
+
+    // Obtains the index
+    occupancy *= bishop_magic_numbers[square];
+
+    // Gets only relevant bits for the index
+    occupancy >>= 64 - bishop_relevant_bits[square];
+
+    return bishop_attacks[square][occupancy];
+
+}
+
+/* Uses magic bitboard technique to get rook attacks */
+U64 MoveCalc::GetRookAttacks(int square, U64 occupancy)
+{ 
+    // Generates relevant blockers
+    occupancy &= rook_masks[square];
+
+    // Obtains the index
+    occupancy *= rook_magic_numbers[square];
+
+    // Gets only relevant bits for the index
+    occupancy >>= 64 - rook_relevant_bits[square];
+
+    return rook_attacks[square][occupancy];
+
 }
