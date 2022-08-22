@@ -43,6 +43,15 @@ vector<int> SerializeBitboard(U64 bb){
 void PrintBoard(U64 bitboard){
    
 
+    // Prints out the binary representation of the board
+    cout << "Binary: " << bitset<64>(bitboard) << endl;
+
+    // Prints out hexadecimal representation of the board
+    printf("Hexadecimal: 0x%lxULL\n", bitboard);
+
+    // Prints out decimal representation of the board
+    printf("Decimal: %d", (int) bitboard);
+
     // Iterates through each rank of the board
     for(int rank=7; rank >= 0; rank--){
 
@@ -68,11 +77,7 @@ void PrintBoard(U64 bitboard){
     // Print board file labels (A-H)
     printf("\n\n      A  B  C  D  E  F  G  H\n\n");
 
-    // Prints out the binary representation of the board
-    cout << "Binary: " << bitset<64>(bitboard) << endl;
-
-    // Prints out hexadecimal representation of the board
-    printf("Hexadecimal: 0x%lxULL\n", bitboard);
+    
 }
 
 void PrintMove(Move move){
@@ -96,3 +101,31 @@ int GetIndexFromSquare(char* square){
     }
     return -1;
 }
+
+/* Generates a random 64 bit number */
+U64 GetRandomU64Numbers()
+{
+    // define 4 random numbers
+    U64 n1, n2;
+
+    // initialize random numbers
+    n1 = (U64) rand();
+    n2 = (U64) rand();
+
+    // Concatenates the random bits
+    return n1 | (n2 << 32);
+}
+
+/* Generate a low non-zero bit candidate for a magic number */
+U64 GenerateMagicCandidate()
+{   
+    // Generates three rand 64 bit numbers
+    U64 n1, n2, n3;
+    n1 = GetRandomU64Numbers();
+    n2 = GetRandomU64Numbers();
+    n3 = GetRandomU64Numbers();
+
+    // Bitwise ands the three numbers to reduce number of 1's
+    return n1 & n2 & n3;
+}
+

@@ -61,6 +61,8 @@ enum
 // White is 0, black is 1
 enum Color{white, black};
 
+enum {rook, bishop};
+
 // Enumerates all possible kinds of pieces
 enum pieceType
 {
@@ -107,3 +109,5 @@ void PrintMove(struct Move move);
 void MoveBit(U64 &bitboard, int start, int end);
 
 int GetIndexFromSquare(char *square);
+
+U64 GenerateMagicCandidate();

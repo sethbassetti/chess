@@ -1,6 +1,14 @@
+#include <string.h>
+
 #include "utils.h"
 #include "move_calc.h"
 
+
+/* Constructor for MoveCalculator class. Initializes all pre-calculated attack tables */
+MoveCalc::MoveCalc()
+{
+    InitSliderMoves();
+}
 
 
 /* Mask bishop attacks for magic bitboard */
@@ -166,4 +174,145 @@ U64 MoveCalc::SetOccupancy(int index, int bits_in_mask, U64 attack_map)
     }
 
     return occupancy_map;
+}
+
+
+U64 MoveCalc::FindMagicNumber(int square, int relevant_bits, int bishop)
+{
+    // init occupancies (every different combination of occupied pieces, up to 4096 for a rook, 512 for a bishop)
+    U64 occupancies[4096];
+
+    // init attack tables (all possible attacks given those occupancies)
+    U64 attacks[4096];
+
+    // init used attacks (attacks that have already been found)
+    U64 used_attacks[4096];
+
+    // init attack_mask for a current piece
+    U64 attack_mask = bishop ? MaskBishopAttacks(square) : MaskRookAttacks(square);
+
+    // occupancy indices (relevant bits tell us how many combinations there are, the max number this could be is 4096)
+    int occupancy_indices = 1 << relevant_bits;
+
+    // loop over occupancy indices
+    for (int index = 0; index < occupancy_indices; index++)
+    {
+        // init occupancies
+        occupancies[index] = SetOccupancy(index, relevant_bits, attack_mask);
+
+        // init attacks (true attacks for a bishop/ rook given some occupancy index)
+        attacks[index] = bishop ? BishopAttacksOnTheFly(square, occupancies[index]) : RookAttacksOnTheFly(square, occupancies[index]);
+
+    }
+
+    // test magic numbers loop
+    for (int random_count=0; random_count < 100000000; random_count++)
+    {
+        // generate magic number candidate
+        U64 magic_number_candidate = GenerateMagicCandidate();
+
+        // skip inappropriate magic numbers
+        if (count_bits((attack_mask * magic_number_candidate) & 0xFF00000000000000) < 6) continue;
+
+        // init used attacks array
+        memset(used_attacks, 0ULL, sizeof(used_attacks));
+
+        // init index & fail flag
+        int index, fail;
+
+        // test magic numbers loop
+        for (index=0, fail=0; !fail && index < occupancy_indices; index++)
+        {
+            // init magic index
+            int magic_index = (int) ((occupancies[index] * magic_number_candidate) >> (64 - relevant_bits));
+
+            // If magic index works, initialize used attacks
+            if (used_attacks[magic_index] == 0ULL){
+                used_attacks[magic_index] = attacks[index];
+            }
+            else if(used_attacks[magic_index] != attacks[index]){
+                // magic index doesn't work
+                fail=1;
+            }
+        }
+
+        // If magic number works
+        if (!fail){
+            // return it
+            return magic_number_candidate;
+        }
+    }
+    printf("Magic number fails");
+    return 0ULL;
+}
+
+void MoveCalc::InitMagicNumbers()
+{
+    for (int rank=0; rank < 8; rank++){
+
+        for (int file=0; file<8; file++)
+        {
+            int square = rank * 8 + file;
+            int relevant_bits = bishop_relevant_bits[square];
+            U64 magic_number = FindMagicNumber(square, relevant_bits, bishop);
+            printf("%10d, ",(int) magic_number);
+        }
+        printf("\n");
+    }
+}
+
+void MoveCalc::InitSliderMasks()
+{
+    for (int square=0; square < 64; square++)
+    {
+        rook_attack_masks[square] = MaskRookAttacks(square);
+        bishop_attack_masks[square] = MaskBishopAttacks(square);
+    }
+}
+/* Iterates through every square and index to construct all possible slider moves */
+void MoveCalc::InitSliderMoves()
+{   
+
+    // Populate rook and bishop attack mask tables
+    InitSliderMasks();
+
+
+    // Constructs attacks for each square
+    for(int square=0; square < 64; square++){
+
+        // Retrieve the appropriate sliding piece attack map
+
+        U64 rook_attack_mask = rook_attack_masks[square];
+        U64 bishop_attack_mask = bishop_attack_masks[square];
+
+        // How many bits could represent blocking pieces (up to 12)
+        int rook_occupancy_bits = rook_relevant_bits[square];
+        int bishop_occupancy_bits = bishop_relevant_bits[square];
+
+        // Populate the rook attack table for each possible combination of blocking pieces
+        for(int index=0; index < 4096; index++)
+        {
+            // Construct a potential map of blockers
+            U64 occupancy = SetOccupancy(index, rook_occupancy_bits, rook_attack_mask);
+
+            // Generate the rook attacks
+            U64 attack = RookAttacksOnTheFly(square, occupancy);
+
+            // Store it in the attack table
+            rook_attacks[square][index] = attack;
+        }
+
+        // Populate the bishop attack table for each possible combination of blocking pieces
+        for(int index=0; index < 512; index++)
+        {
+            // Construct a potential map of blockers
+            U64 occupancy = SetOccupancy(index, bishop_occupancy_bits, bishop_attack_mask);
+
+            // Generate the bishop attacks
+            U64 attack = BishopAttacksOnTheFly(square, occupancy);
+
+            // Store it in the attack table
+            bishop_attacks[square][index] = attack;
+        }
+    }
 }

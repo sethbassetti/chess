@@ -10,17 +10,19 @@ TARGET = main
 #These just denote which folders to store files in
 BIN = bin
 SRC = src
-INCLUDE = -I include -I /home/sethbassetti/emsk/emsdk/upstream/include
+INCLUDE = -I include
 
-all: $(BIN)/$(TARGET)
+all: clean build run
 
-run: clean all
-	clear
+
+build:	$(SRC)/*.cpp
+	$(CXX) $(CXX_FLAGS) $(INCLUDE) $^ -o $(BIN)/$(TARGET)
+
+
+run: $(BIN)/$(TARGET)
 	./$(BIN)/$(TARGET)
 
-$(BIN)/$(TARGET): $(SRC)/*.cpp
-	$(CXX) $(CXX_FLAGS) $(INCLUDE) $^ -o $@ 
 
 clean:
-	-rm $(BIN)/*
+	-$(RM) $(BIN)/*
 
