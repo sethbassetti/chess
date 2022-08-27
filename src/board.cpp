@@ -12,7 +12,7 @@
 
 #include "utils.h"
 #include "board.h"
-#include "position.h"
+#include "move_calc.h"
 
 
 using namespace std;
@@ -155,176 +155,651 @@ Board::Board(string fen_string){
         if (square_index[i] == field) enpassant = i;
     }
 
+    // initialize the occupancy bitboards
+    occupancies[white] = pieces[P] | pieces[N] | pieces[B] | pieces[R] | pieces[Q] | pieces[K];
+    occupancies[black] = pieces[p] | pieces[n] | pieces[b] | pieces[r] | pieces[q] | pieces[k];
+    occupancies[both] = occupancies[white] | occupancies[black];
+}
+
+/* Given a square, checks if that square is attacked by a given side (white or black) */
+bool Board::IsSquareAttacked(int square, int side)
+{
+    // attacked by white pawns
+    if((side == white) && (move_calc.pawn_attacks[black][square] & pieces[P])) return true;
+
+    // attacked by black pawns
+    if ((side==black) && (move_calc.pawn_attacks[white][square] & pieces[p])) return true;
+
+    // attacked by knights
+    if (move_calc.knight_attacks[square] & ((side == white) ? pieces[N] : pieces[n])) return true;
+
+    // attacked by bishops
+    if (move_calc.GetBishopAttacks(square, occupancies[both]) & ((side==white) ? pieces[B] : pieces[b])) return true;
+    
+    // attacked by rooks
+    if (move_calc.GetRookAttacks(square, occupancies[both]) & ((side==white) ? pieces[R] : pieces[r])) return true;
+
+    // attacked by queens
+    if (move_calc.GetQueenAttacks(square, occupancies[both]) & ((side==white) ? pieces[Q] : pieces[q])) return true;
+
+    // attacked by king
+    if (move_calc.king_attacks[square] & ((side == white) ? pieces[K] : pieces[k])) return true;
+
+    // If not attacked by anything, return false
+    return false;
 }
 
 
-/* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
-could attack*/
-U64 Board::CalcPawnAttacks(int side, int square){
+/* Generates a list of pseudo-legal moves */
+void Board::GenerateMoves(MoveList *move_list)
+{
+    // Init the source square and target of any move
+    int source_square, target_square;
 
-    // Stores the attacks
-    U64 attacks = 0ULL;
+    // Initializes the enemy color
+    int enemy = turn_to_move ^ 1;
 
-    // Stores the piece on the square
-    U64 bitboard = 0ULL;
+    // If white, offset will be 0, (P + 0 = P), otherwise offset will be 6 (P + 6 = p) to denote white/black pieces
+    int offset = turn_to_move * 6;
 
-    // set piece on board
-    set_bit(bitboard, square);
+    // init a bitboard to hold current piece as well as all of it's attacks
+    U64 bitboard, attacks;
 
-    // white pawns
-    if(!side)
+    // Generates castling moves, pawn pushes, and pawn attacks in their own functions since they are tricky to generate
+    GenerateCastleMoves(move_list);
+    GenerateQuietPawnMoves(move_list);
+    GeneratePawnAttacks(move_list);
+
+
+    /**** Knight Moves ****/
+
+    // Get the appropriately colored knight bitboard
+    bitboard = pieces[N + offset];
+
+    while(bitboard)
     {
-        // Only place an attack square up and to the left if not on outer "a" file
-        if(bitboard & not_a_file){
-            attacks |= (bitboard << 7);
+        // get source square and attacks
+        source_square = BitScan(bitboard);
+        attacks = move_calc.knight_attacks[source_square] & ~occupancies[turn_to_move];
+
+        // Iterate over attacks
+        while(attacks)
+        {   
+            // get target square from bitboard
+            target_square = BitScan(attacks);
+
+            // Construct the move and add it to the list
+            int move = encode_move(source_square, target_square, (N + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            AddMove(move_list, move);
+            
+            // pop after move is generated
+            pop_bit(attacks, target_square);
         }
 
-        // Only place an attack square up and to the right if not on outer "h" file
-        if(bitboard & not_h_file){
-            attacks |= (bitboard << 9);
-        }
+        // pop bit after 
+        pop_bit(bitboard, source_square);
     }
 
-    // Black pawns
+    /**** Rook Moves ****/
+    bitboard = (turn_to_move == white) ? pieces[R] : pieces[r];
+
+    while(bitboard)
+    {
+        // get source square and attacks
+        source_square = BitScan(bitboard);
+        attacks = move_calc.GetRookAttacks(source_square, occupancies[both]) & ~occupancies[turn_to_move];
+
+        // Iterate over attacks
+        while(attacks)
+        {   
+            // get target square from bitboard
+            target_square = BitScan(attacks);
+
+            // Construct the move and add it to the list
+            int move = encode_move(source_square, target_square, (R + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            AddMove(move_list, move);
+            
+            // pop after move is generated
+            pop_bit(attacks, target_square);
+        }
+
+        // pop bit after 
+        pop_bit(bitboard, source_square);
+    }
+
+    /**** Bishop Moves ****/
+    bitboard = (turn_to_move == white) ? pieces[B] : pieces[b];
+
+    while(bitboard)
+    {
+        // get source square and attacks
+        source_square = BitScan(bitboard);
+        attacks = move_calc.GetBishopAttacks(source_square, occupancies[both]) & ~occupancies[turn_to_move];
+
+        // Iterate over attacks
+        while(attacks)
+        {   
+            // get target square from bitboard
+            target_square = BitScan(attacks);
+
+            // Construct the move and add it to the list
+            int move = encode_move(source_square, target_square, (B + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            AddMove(move_list, move);
+            
+            // pop after move is generated
+            pop_bit(attacks, target_square);
+        }
+
+        // pop bit after 
+        pop_bit(bitboard, source_square);
+    }
+
+    /**** Queen Moves ****/
+    bitboard = (turn_to_move == white) ? pieces[Q] : pieces[q];
+
+    while(bitboard)
+    {
+        // get source square and attacks
+        source_square = BitScan(bitboard);
+        attacks = move_calc.GetQueenAttacks(source_square, occupancies[both]) & ~occupancies[turn_to_move];
+
+        // Iterate over attacks
+        while(attacks)
+        {   
+            // get target square from bitboard
+            target_square = BitScan(attacks);
+
+            // Construct the move and add it to the list
+            int move = encode_move(source_square, target_square, (Q + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            AddMove(move_list, move);
+            
+            // pop after move is generated
+            pop_bit(attacks, target_square);
+        }
+
+        // pop bit after 
+        pop_bit(bitboard, source_square);
+    }
+
+    /**** King Moves ****/
+    bitboard = (turn_to_move == white) ? pieces[K] : pieces[k];
+
+    while(bitboard)
+    {
+        // get source square and attacks
+        source_square = BitScan(bitboard);
+        attacks = move_calc.king_attacks[source_square] & ~occupancies[turn_to_move];
+
+        // Iterate over attacks
+        while(attacks)
+        {   
+            // get target square from bitboard
+            target_square = BitScan(attacks);
+
+            // Construct the move and add it to the list
+            int move = encode_move(source_square, target_square, (K + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            AddMove(move_list, move);
+            
+            // pop after move is generated
+            pop_bit(attacks, target_square);
+        }
+
+        // pop bit after 
+        pop_bit(bitboard, source_square);
+    }
+}
+
+/* Generates all pawn pushes (single and double) moves, including promotions */
+void Board::GenerateQuietPawnMoves(MoveList *move_list)
+{
+
+    // Initialize a variable to hold the source square and target square
+    int source_square, target_square;
+    
+    // Initialize a move variable to contain the moves
+    int move;
+
+    // This will hold the pawn pieces
+    U64 bitboard;
+
+    // If turn to move is white, generate white pawn piece moves
+    if (turn_to_move == white)
+    {
+        bitboard = pieces[P];
+
+        // single push targets will be the white pawn shifted up 8 anded with negation of occupancies (empty squares)
+        U64 white_pawn_single_targets = bitboard << 8 & ~occupancies[both];
+
+        // Loop over target squares for white pawns
+        while (white_pawn_single_targets)
+        {
+            // init target square
+            target_square = BitScan(white_pawn_single_targets);
+
+            // source square will be rank below target
+            source_square = target_square - 8;
+            
+            // If target square is in the back row
+            if ((1ULL << target_square) & first_last_ranks)
+            {
+
+                // Add all the possible promotions
+                move = encode_move(source_square, target_square, P, N, 0, 0, 0, 0);
+                AddMove(move_list, move);
+                move = encode_move(source_square, target_square, P, R, 0, 0, 0, 0);
+                AddMove(move_list, move);
+                move = encode_move(source_square, target_square, P, B, 0, 0, 0, 0);
+                AddMove(move_list, move);
+                move = encode_move(source_square, target_square, P, Q, 0, 0, 0, 0);
+                AddMove(move_list, move);
+            }
+
+            // Otherwise print it out with no promotions
+            else 
+            {
+                move = encode_move(source_square, target_square, P, 0, 0, 0, 0, 0);
+                AddMove(move_list, move);
+            }
+
+            // pop the bit from the target squares
+            pop_bit(white_pawn_single_targets, target_square);
+        }
+
+        // Double push targets are pawns shifted up 16 that end up on rank 4
+        U64 white_pawn_double_targets = (bitboard << 16) & rank4 & ~(occupancies[both] |(occupancies[both] << 8));
+
+        // Loop over targets
+        while(white_pawn_double_targets)
+        {
+            // Get target square
+            target_square = BitScan(white_pawn_double_targets);
+
+            // get source square
+            source_square = target_square - 16;
+            move = encode_move(source_square, target_square, P, 0, 0, 1, 0, 0);
+            AddMove(move_list, move);
+
+            pop_bit(white_pawn_double_targets, target_square);
+        }
+    }
+    // Otherwise generate black pieces moves
     else
     {
-        if(bitboard & not_a_file){
-            attacks |= (bitboard >> 9);
+        bitboard = pieces[p];
+
+        // single push targets will be the white pawn shifted up 8 anded with negation of occupancies (empty squares)
+        U64 black_pawn_single_targets = bitboard >> 8 & ~occupancies[both];
+
+        // Loop over target squares for white pawns
+        while (black_pawn_single_targets)
+        {
+            // init target square
+            target_square = BitScan(black_pawn_single_targets);
+
+            // source square will be rank below target
+            source_square = target_square + 8;
+            
+            // If target square is in the back row
+            if ((1ULL << target_square) & first_last_ranks)
+            {
+                // Add all the possible promotions
+                move = encode_move(source_square, target_square, p, n, 0, 0, 0, 0);
+                AddMove(move_list, move);
+                move = encode_move(source_square, target_square, p, r, 0, 0, 0, 0);
+                AddMove(move_list, move);
+                move = encode_move(source_square, target_square, p, b, 0, 0, 0, 0);
+                AddMove(move_list, move);
+                move = encode_move(source_square, target_square, p, q, 0, 0, 0, 0);
+                AddMove(move_list, move);
+            }
+
+            // Otherwise print it out with no promotions
+            else 
+            {
+                move = encode_move(source_square, target_square, p, 0, 0, 0, 0, 0);
+                AddMove(move_list, move);
+            }
+
+            // pop the bit from the target squares
+            pop_bit(black_pawn_single_targets, target_square);
         }
-        if(bitboard & not_h_file){
-            attacks |= (bitboard >> 7);
+
+        // Double push targets are pawns shifted up 16 that end up on rank 4
+        U64 black_pawn_double_targets = (bitboard >> 16) & rank5 & ~(occupancies[both] | (occupancies[both] >> 8)) ;
+
+        // Loop over targets
+        while(black_pawn_double_targets)
+        {
+            // Get target square
+            target_square = BitScan(black_pawn_double_targets);
+
+            // get source square
+            source_square = target_square + 16;
+            move = encode_move(source_square, target_square, p, 0, 0, 1, 0, 0);
+            AddMove(move_list, move);
+
+            pop_bit(black_pawn_double_targets, target_square);
         }
     }
-
-    return attacks;
 }
 
+void Board::GenerateCastleMoves(MoveList *move_list)
+{
 
+    // stores the move
+    int move;
 
-/* Given a color and reference to a move list, populates the move list
-with all pawn moves of the given color */
-void Board::GeneratePawnMoves(vector<Move> &moves){
-
-    // Offset changes the pawn bitboards from black or white (since they are 6 spots apart in the array)
-    int offset = turn_to_move * 6;
-
-    // Ends up being -1 for black, 1 for white
-    int color_flag = (turn_to_move - (turn_to_move ^ 1)) * -1;
-
-    // Selects pawn 
-    U64 pawns = position.pieces[white_pawn + offset];
-    U64 enemy_pieces = position.colors[turn_to_move ^ 1];
-    
-
-    // Serialize the pawns into a vector of their integer indices
-    vector<int> pawn_indices = SerializeBitboard(pawns);
-
-    // Get pawn attacks
-    for(int pawn : pawn_indices)
-                {
-
-                    // Iterates through each posible attack the pawn could make
-                    vector<int> attack_indices = SerializeBitboard(pawn_attacks[turn_to_move][pawn]);
-
-                    // Iterates through the attacks, adding moves to the move list
-                    for (int target : attack_indices)
-                    {
-                        // If the bit is set on enemy pieces, this is a capture
-                        if (get_bit(enemy_pieces, target))
-                        {
-                            // Retrieve which type of piece is being captured
-                            int captured_piece = position.GetPieceType(target);
-                            struct Move move = {pawn, target, capture, captured_piece};
-                            if (get_bit(first_last_ranks, target))
-                            {
-                                move.promo_piece = white_knight;
-                                struct Move secondPromo = move;
-                                secondPromo.promo_piece = white_queen;
-                                Move thirdPromo = secondPromo;
-                                thirdPromo.promo_piece = white_rook;
-                                Move fourthPromo = secondPromo;
-                                fourthPromo.promo_piece = white_bishop;
-                                moves.push_back(secondPromo);
-                                moves.push_back(thirdPromo);
-                                moves.push_back(fourthPromo);
-                            }
-                            moves.push_back(move);
-                        }
-                        if (target == enpassant)
-                        {
-                            int offset = (turn_to_move == white) ? -8 : 8;
-                            int captured_piece = position.GetPieceType(target + offset);
-                            struct Move move = {pawn, target, ep_capture, captured_piece};
-                            moves.push_back(move);
-                        }
-                    }
+    // Generate white side castling moves
+    if (turn_to_move == white)
+    {
+        // Make sure white can castle king side
+        if (castling_rights & wk)
+        {
+            // Make sure there are no squares blocking the castle
+            if (!get_bit(occupancies[both], f1) && !get_bit(occupancies[both], g1))
+            {
+                // Make sure king does not move through an attacked square (and is not in check already)
+                if (!IsSquareAttacked(e1, black) && !(IsSquareAttacked(f1, black))){
+                    move = encode_move(e1, g1, K, 0, 0, 0, 0, 1);
+                    AddMove(move_list, move);
                 }
-
-    // Calls CalcPawnPushes() to construct setwise pawn push tables
-    CalcPawnPushes();
-
-    // Gets single pawn pushes
-    vector<int> single_pawn_push_indices = SerializeBitboard(single_pawn_pushes[turn_to_move]);
-    
-    // Iterates through every target within the pawn push table
-    for(int target : single_pawn_push_indices){
-
-        // Subtract(for white), or adds (for black) 8 to get the rank either directly above or directly
-        // below the target. This is because for a single pawn push, the origin will always be the previous rank
-        int start = target - 8 * color_flag;
-        struct Move move = {start, target, quiet, blank};
-        
-        if(get_bit(first_last_ranks, target)){
-                    move.promo_piece = white_knight;
-                    struct Move secondPromo = move;
-                    secondPromo.promo_piece = white_queen;
-                    Move thirdPromo = secondPromo;
-                    thirdPromo.promo_piece = white_rook;
-                    Move fourthPromo = secondPromo;
-                    fourthPromo.promo_piece = white_bishop;
-                    moves.push_back(secondPromo);
-                    moves.push_back(thirdPromo);
-                    moves.push_back(fourthPromo);
+            }
         }
-        moves.push_back(move);
-    }
-    // Gets double pawn push moves
-    vector<int> double_pawn_push_indices = SerializeBitboard(double_pawn_pushes[turn_to_move]);
-    for(int target : double_pawn_push_indices){
-        // Either subtracts or adds 16 to get the origin square two ranks above or below the target
-        // square
-        int start = target - 16 * color_flag;
-        struct Move move = {start, target, double_pawn_push, blank};
-        moves.push_back(move);
+        // Make sure white can castle queen side
+        if(castling_rights & wq)
+        {
+             // Make sure there are no squares blocking the castle
+            if (!get_bit(occupancies[both], c1) && !get_bit(occupancies[both], d1))
+            {
+                // Make sure king does not move through an attacked square (and is not in check already)
+                if (!IsSquareAttacked(d1, black) && !(IsSquareAttacked(e1, black))){
+                    move = encode_move(e1, c1, K, 0, 0, 0, 0, 1);
+                    AddMove(move_list, move);
+                }
+            }
+        }
     }
 
+    // Generate black side castling moves
+    if (turn_to_move == black)
+    {
+        // Make sure white can castle king side
+        if (castling_rights & bk)
+        {
+            // Make sure there are no squares blocking the castle
+            if (!get_bit(occupancies[both], f8) && !get_bit(occupancies[both], g8))
+            {
+                // Make sure king does not move through an attacked square (and is not in check already)
+                if (!IsSquareAttacked(e8, white) && !(IsSquareAttacked(f8, white))){
+                    move = encode_move(e8, g8, k, 0, 0, 0, 0, 1);
+                    AddMove(move_list, move);
+                }
+            }
+        }
+        // Make sure white can castle queen side
+        if(castling_rights & bq)
+        {
+             // Make sure there are no squares blocking the castle
+            if (!get_bit(occupancies[both], c8) && !get_bit(occupancies[both], d8))
+            {
+                // Make sure king does not move through an attacked square (and is not in check already)
+                if (!IsSquareAttacked(d8, white) && !(IsSquareAttacked(e8, white))){
+                    move = encode_move(e8, c8, k, 0, 0, 0, 0, 1);
+                    AddMove(move_list, move);
+                }
+            }
+        }
+    }
+
+        
+
+}
+
+/* Generates all possible pawn capture moves */
+void Board::GeneratePawnAttacks(MoveList* move_list)
+{
+
+    // init source and target squares as well as attack and source bitboards
+    int source_square, target_square;
+    U64 bitboard, attacks;
+
+    // init move variable to store move
+    int move;
+
+    // define the color of the enemy pieces
+    int enemy = turn_to_move ^ 1;
+
+    // define an offset to determine the appropriately colored piece
+    int offset = turn_to_move * 6;
+
+    // Define which source pawns we are going to use, depending on side
+    bitboard = (turn_to_move  == white) ? pieces[P] : pieces[p];
+
+    // Iterate over the source squares
+    while(bitboard)
+    {
+        // retrieve the source square
+        source_square = BitScan(bitboard);
+
+        // Retrieve the attacks from the current turn's side that can hit an enemy
+        // Adds the en passant square to the move to indicate that it can move (if enpassant is available)
+        attacks = move_calc.pawn_attacks[turn_to_move][source_square] & (occupancies[enemy] | (1ULL << enpassant));
+
+        
+
+
+        // Iterate over the attack target squares
+        while(attacks)
+        {
+            // Retrieve the target square from the attacks
+            target_square = BitScan(attacks);
+
+            // If the target square is in the first or last ranks, this should be a promotion move
+            if (1ULL << target_square & first_last_ranks)
+            {   
+                // Add all the possible promotions
+                move = encode_move(source_square, target_square, (P+offset), (N+offset), 1, 0, 0, 0);
+                AddMove(move_list, move);
+                move = encode_move(source_square, target_square, (P+offset), (R+offset), 1, 0, 0, 0);
+                AddMove(move_list, move);
+                move = encode_move(source_square, target_square, (P+offset), (B+offset), 1, 0, 0, 0);
+                AddMove(move_list, move);
+                move = encode_move(source_square, target_square, (P+offset), (Q+offset), 1, 0, 0, 0);
+                AddMove(move_list, move);
+            }
+            else
+            {
+                
+                // Otherwise print out the capture
+                move = encode_move(source_square, target_square, (P+offset), 0, 1, 0, (target_square == enpassant), 0);
+                AddMove(move_list, move);
+            }
+
+           
+            // Pop bit off attacks bitboard
+            pop_bit(attacks, target_square);
+        }
+        pop_bit(bitboard, source_square);
+
+
+    }
+}
+
+/* Adds a move to the given move list */
+void Board::AddMove(MoveList *move_list, int move){
+
+    // Add the given move
+    move_list->moves[move_list->count] = move;
+
+    // Increment the number of moves currently held
+    move_list->count++;
     
 }
 
-void Board::CalcPawnPushes(){
 
-    U64 rank4 = 0x00000000FF000000ULL;
-    U64 rank5 = 0x000000FF00000000ULL;
-    U64 white_pawns = position.pieces[white_pawn];
-    U64 black_pawns = position.pieces[black_pawn];
+int Board::MakeMove(int move, int move_flag)
+{
 
-    single_pawn_pushes[white] = (white_pawns << 8) & position.empty;
-    single_pawn_pushes[black] = (black_pawns >> 8) & position.empty;
+    // Used for looking at the correct side
+    int offset = (turn_to_move) * 6;
+    int enemy_offset = (turn_to_move ^ 1) * 6;
 
-    double_pawn_pushes[white] = (single_pawn_pushes[white] << 8) & position.empty & rank4;
-    double_pawn_pushes[black] = (single_pawn_pushes[black] >> 8) & position.empty & rank5;
+    // quiet moves
+    if (move_flag == all_moves)
+    {
+        // parse move
+        int source_square = get_move_source(move);
+        int target_square = get_move_target(move);
+        int piece = get_move_piece(move);
+        int promoted = get_move_promoted(move);
+        int capture = get_move_capture(move);
+        int double_push = get_move_double(move);
+        int enpass = get_move_enpassant(move);
+        int castling = get_move_castling(move);
 
+        // move piece
+        pop_bit(pieces[piece], source_square);
+        set_bit(pieces[piece], target_square);
+
+        // handle capture moves
+        if (capture)
+        {
+            
+
+            // pick up bitboard piece index ranges depending on side
+            int start_piece = P + enemy_offset;
+            int end_piece = K + enemy_offset;
+
+            // loop over all of the enemy pieces to see which one is being captures
+            for (int bb_piece = start_piece; bb_piece <= end_piece; bb_piece++)
+            {
+                // if there is a piece on the target square
+                if (get_bit(pieces[bb_piece], target_square))
+                {
+                    // then remove it and stop looking for pieces   
+                    pop_bit(pieces[bb_piece], target_square);
+                    break;
+                }
+            }
+        }
+
+        // Handle promotions
+        if (promoted)
+        {   
+            // remove the enemy pawn from the last rank
+            pop_bit(pieces[P + offset], target_square);
+
+            // initialize a new promoted piece on that square
+            set_bit(pieces[promoted], target_square);
+        }
+
+        
+
+        // Handle en passant moves
+        if (enpass)
+        {
+            cout << square_index[target_square] << endl;
+            // If white's turn, remove black pawn at the appropriate spot, otherwise remove white pawn
+            (turn_to_move == white) ? (pop_bit(pieces[p], (target_square - 8))) : (pop_bit(pieces[P], (target_square + 8)));
+
+        }
+
+        // Always reset en passant square before checking for double pushes and after checking for en passant captures
+        enpassant = no_sq;
+
+        // Handle double pushes
+        if (double_push)
+        {   
+            // If a pawn has a double move, then set the en passant square
+            enpassant = (turn_to_move == white) ? (target_square - 8) : (target_square + 8);
+        }
+
+        // Handle castle moves
+        if (castling)
+        {
+            switch(target_square)
+            {
+                case (g1):
+                    // Move H rook
+                    pop_bit(pieces[R], h1);
+                    set_bit(pieces[R], f1);
+
+                    // update castling rights so white can't castle
+                    castling_rights &= ~(wk | wq);
+                    break;
+
+                case (c1):
+                    // Move A rook
+                    pop_bit(pieces[R], a1);
+                    set_bit(pieces[R], d1);
+
+                    // update castling rights so white can't castle
+                    castling_rights &= ~(wk | wq);       
+                    break;
+
+                case (g8):
+                    // Move H rook
+                    pop_bit(pieces[r], h8);
+                    set_bit(pieces[r], f8);
+
+                    // update castling rights so black can't castle
+                    castling_rights &= ~(bk | bq);
+                    break;
+                
+                case (c8):
+                    // Move A Rook
+                    pop_bit(pieces[r], a8);
+                    set_bit(pieces[r], d8);
+
+                    // update castling rights so black can't castle
+                    castling_rights &= ~(bk | bq);
+                    break;
+            }
+        }
+
+        // Re-initialize the occupancies bitboards after a move has been made
+        occupancies[white] = pieces[P] | pieces[N] | pieces[R] | pieces[B] | pieces[Q] | pieces[K];
+        occupancies[black] = pieces[p] | pieces[n] | pieces[r] | pieces[b] | pieces[q] | pieces[k];
+        occupancies[both] = occupancies[white] | occupancies[black];
+
+    }
+
+    // capture moves
+    else
+    {
+        // If it is a capture move, make it
+        if (get_move_capture(move))
+            MakeMove(move, all_moves);
+
+        // otherwise return 0
+        else
+            return 0;
+    }
 }
 
 
-void Board::GenerateKnightMoves(vector<Move> &move_list){
+void Board::perft_driver(){
+    
+    MoveList moves;
 
-    int offset = turn_to_move * 6;
-    U64 knights = position.pieces[white_knight + offset];
+    GenerateMoves(&moves);
 
-    vector<int> knight_indices = SerializeBitboard(knights);
-    FillMoveList(knight_indices, knight_attacks, move_list);
+    for (int i = 0; i < moves.count; i++){
+        int move = moves.moves[i];
+
+        copy_board();
+        getchar();
+        Display();
+        MakeMove(move, all_moves);
+        getchar();
+        Display();
+
+        take_back();
+
+    }
+
 }
+/*
 
 void Board::GenerateKingMoves(vector<Move> &move_list){
 
@@ -369,6 +844,9 @@ void Board::GenerateKingMoves(vector<Move> &move_list){
     }
     
 }
+*/
+
+/*
 
 void Board::GenerateSliderMoves(vector<Move> &move_list){
 
@@ -427,8 +905,9 @@ vector<Move> Board::GenerateMoveList(){
     return legal_moves;
 }
 
-/* Parses the move list and returns a new move list with only legal moves. I.e. moves that do not put the king
-in check and valid castle moves (no intermediate squares under attack) */
+ Parses the move list and returns a new move list with only legal moves. I.e. moves that do not put the king
+in check and valid castle moves (no intermediate squares under attack) 
+
 vector<Move> Board::ParseLegalMoves(vector<Move> move_list){
 
     vector<Move> legal_moves;
@@ -460,9 +939,9 @@ vector<Move> Board::ParseLegalMoves(vector<Move> move_list){
     return legal_moves;
 }
 
-/* This function takes a move object and moves the necessary pieces on the board. It looks at the move type,
+ This function takes a move object and moves the necessary pieces on the board. It looks at the move type,
 such as castling, promotions, or en passants, and does the necessary board adjustments to accurately make that move.
-At the end of the function, it resets the board's position object to reflect the changes */
+At the end of the function, it resets the board's position object to reflect the changes 
 void Board::MakeMove(Move move){
 
     // Before making the move, store the board's game state so that this move can be unmade
@@ -564,7 +1043,7 @@ void Board::MakeMove(Move move){
     ToggleMove();
 }
 
-/* Attempts to make a move with a starting and ending square, returns 1 if successful, 0 otherwise */
+Attempts to make a move with a starting and ending square, returns 1 if successful, 0 otherwise 
 int Board::MakeMove(int start, int end){
     vector<Move> moves = GenerateMoveList();
     for(Move move : moves){
@@ -577,23 +1056,8 @@ int Board::MakeMove(int start, int end){
     return 0;
 }
 
-/* Given a move object, reverse the operations performed by MakeMove(). This restores all aspects of the game state, such
-as castling rights and piece positions */
-void Board::UnMakeMove(Move move)
-{
 
-    gameState prev_state = game_state_hist.back();
-    game_state_hist.pop_back();
-    castling_rights = prev_state.castling_rights;
-    memcpy(queen_attacks, prev_state.queen_attacks, sizeof(queen_attacks));
-    memcpy(rook_attacks, prev_state.rook_attacks, sizeof(rook_attacks));
-    memcpy(bishop_attacks, prev_state.bishop_attacks, sizeof(bishop_attacks));
-    enpassant = prev_state.en_passant_square;
-    position = prev_state.position;
-    ToggleMove();
-}
-
-/* Returns true if the king of the input color is being attacked by any other enemy piece */
+Returns true if the king of the input color is being attacked by any other enemy piece 
 bool Board::KingInCheck(int color){
     
     // Offset determines what color of king to retrieve
@@ -608,30 +1072,6 @@ bool Board::KingInCheck(int color){
     return IsSquareAttacked(king_square, color);
 }
 
-/* Returns true if a piece on a square of a given color could be attacked by an enemy of the opposite color */
-bool Board::IsSquareAttacked(int square, int color){
-
-    int enemy_offset = 6 * (color ^ 1);
-
-    // Retrieves the bitboard of enemy pawns opposite the kings color
-    U64 enemy_pawns = position.pieces[white_pawn + enemy_offset];
-    U64 enemy_knights = position.pieces[white_knight + enemy_offset];
-    U64 enemy_king = position.pieces[white_king + enemy_offset];
-    U64 enemy_rooks = position.pieces[white_rook + enemy_offset];
-    U64 enemy_bishops = position.pieces[white_bishop + enemy_offset];
-    U64 enemy_queens = position.pieces[white_queen + enemy_offset];
-    
-    // Goes through every piece type, looking for a possible attack
-    bool attacked_by_pawn = pawn_attacks[color][square] & enemy_pawns;
-    bool attacked_by_knight = knight_attacks[square] & enemy_knights;
-    bool attacked_by_king = king_attacks[square] & enemy_king;
-    bool attacked_by_rook = rook_attacks[square] & enemy_rooks;
-    bool attacked_by_bishop = bishop_attacks[square] & enemy_bishops;
-    bool attacked_by_queen = queen_attacks[square] & enemy_queens;
-
-    // If any of these are true, the square is under attack
-    return attacked_by_pawn | attacked_by_knight | attacked_by_rook | attacked_by_queen | attacked_by_king | attacked_by_bishop;
-}
 
 int Board::perft(int depth){
     int nodes = 0;
@@ -654,34 +1094,14 @@ int Board::perft(int depth){
 
     return nodes;
 }
+*/
 
-void Board::perft_test(int depth){
-    
-    clock_t start;
-    double duration;
-    start = clock();
-    
-    
-    int total_count = 0;
-    vector<Move> moves = GenerateMoveList();
-    for(Move move : moves){
-        MakeMove(move);
-        int count = perft(depth - 1);
-        total_count += count;
-        UnMakeMove(move);
-        PrintMove(move);
-        printf(": %d\n", count);
-    }
-    duration = (clock() - start) / (double)CLOCKS_PER_SEC;
-    printf("Perft: %d nodes searched\n", total_count);
-    printf("Took %f seconds\n", duration);
-}
-
+/*
 void Board::ToggleMove(){
     turn_to_move ^= 1;
 }
 
-/* Displays the board in ASCII format */
+ Displays the board in ASCII format */
 void Board::Display(){
 
     // ASCII characters for all of the board pieces
@@ -737,14 +1157,7 @@ void Board::Display(){
 
 }
 
-int Board::GetCurrentPlayer(){
-    return turn_to_move;
-}
-
-Position Board::GetPosition(){
-    return position;
-}
-
+/*
 int Board::IsValidMove(int start, int end)
 {
     vector<Move> moves = GenerateMoveList();
@@ -755,8 +1168,4 @@ int Board::IsValidMove(int start, int end)
         }
     }
     return false;
-}
-
-std::string Board::GetBoardFEN(){
-    return position.GenerateFEN();
-}
+}*/

@@ -16,13 +16,13 @@ class Game{
     
         int GetPlayerColor();
 
-        int IsValidInput(string input);
-        vector<int> ParsePlayerInput(string input);
+        //int IsValidInput(string input);
+        //vector<int> ParsePlayerInput(string input);
         void MakePlayerMove();
         void MakeAIMove();
 
         void UpdateGame();
 
-        Move NegaMaxRoot(int depth);
+        //Move NegaMaxRoot(int depth);
         int NegaMax(int depth);
 };

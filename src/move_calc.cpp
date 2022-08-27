@@ -15,6 +15,47 @@ MoveCalc::MoveCalc()
     InitLeaperMoves();
 }
 
+/* Given a color and a square on the board, returns a bitboard representing where a pawn on that square
+could attack*/
+U64 MoveCalc::CalcPawnAttacks(int square, int side){
+
+    // Stores the attacks
+    U64 attacks = 0ULL;
+
+    // Stores the piece on the square
+    U64 bitboard = 0ULL;
+
+    // set piece on board
+    set_bit(bitboard, square);
+
+    // white pawns
+    if(!side)
+    {
+        // Only place an attack square up and to the left if not on outer "a" file
+        if(bitboard & not_a_file){
+            attacks |= (bitboard << 7);
+        }
+
+        // Only place an attack square up and to the right if not on outer "h" file
+        if(bitboard & not_h_file){
+            attacks |= (bitboard << 9);
+        }
+    }
+
+    // Black pawns
+    else
+    {
+        if(bitboard & not_a_file){
+            attacks |= (bitboard >> 9);
+        }
+        if(bitboard & not_h_file){
+            attacks |= (bitboard >> 7);
+        }
+    }
+
+    return attacks;
+}
+
 /* Returns a bitboard of locations a king could attack if it were on a given square */
 U64 MoveCalc::CalcKingAttacks(int square){
     // Stores the attacks
@@ -362,6 +403,13 @@ void MoveCalc::InitLeaperMoves()
     {
         king_attacks[square] = CalcKingAttacks(square);
         knight_attacks[square] = CalcKnightAttacks(square);
+
+        // Iterate over both white and black colors
+        for (int color: {white, black})
+        {
+            // Calculate pawn attacks for that square and color and store it in bitboards
+            pawn_attacks[color][square] = CalcPawnAttacks(square, color);
+        }
     }
 }
 
@@ -401,14 +449,4 @@ U64 MoveCalc::GetRookAttacks(int square, U64 occupancy)
 U64 MoveCalc::GetQueenAttacks(int square, U64 occupancy)
 {
     return GetRookAttacks(square, occupancy) | GetBishopAttacks(square, occupancy);
-}
-
-U64 MoveCalc::GetKingAttacks(int square)
-{
-    return king_attacks[square];
-}
-
-U64 MoveCalc::GetKnightAttacks(int square)
-{
-    return knight_attacks[square];
 }

@@ -4,7 +4,6 @@
 #include <bitset>
 #include <string.h>
 #include "utils.h"
-#include "position.h"
 
 using namespace std;
 
@@ -80,10 +79,15 @@ void PrintBoard(U64 bitboard){
     
 }
 
-void PrintMove(Move move){
-    string start = square_index[move.start];
-    string end = square_index[move.end];
-    cout << start << end;
+/* Prints out the move as source - target - promoted piece */
+void PrintMove(int move){
+
+    cout << piece_to_str[get_move_piece(move)]  \
+         << ((get_move_capture(move)) ? " capture" : "") \
+         << ": " << square_index[get_move_source(move)] \
+         << square_index[get_move_target(move)] \
+         << promoted_pieces[get_move_promoted(move)] \
+         << endl;
 }
 
 void MoveBit(U64 &bitboard, int start, int end){

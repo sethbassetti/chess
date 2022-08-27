@@ -1,2 +1,2 @@
-#include "position.h"
-int Evaluate(Position position, int color);
+#include "board.h"
+int Evaluate(Board board, int color);

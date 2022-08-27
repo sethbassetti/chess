@@ -16,9 +16,13 @@ public:
     U64 GetRookAttacks(int square, U64 occupancy);
     U64 GetQueenAttacks(int square, U64 occupancy);
 
-    // Given a square, will return the leaper attack map for that piece
-    U64 GetKingAttacks(int square);
-    U64 GetKnightAttacks(int square);
+
+    // Pre calculated knight and king attack tables
+    U64 knight_attacks[64];
+    U64 king_attacks[64];
+
+    // Precalculated pawn attack tables [side][square]
+    U64 pawn_attacks[2][64];
         
     // Initializes a list of magic numbers to be used in the program
     void InitMagicNumbers(int bishop);
@@ -194,13 +198,7 @@ private:
     U64 rook_attacks    [64][4096];
     U64 bishop_attacks  [64][512];
 
-
-    // Pre calculated knight and king attack tables
-    U64 knight_attacks[64];
-    U64 king_attacks[64];
-
-    // Precalculated pawn attack tables [side][square]
-    U64 pawn_attacks[2][64];
+    
 
     /* Below functions used for magic bitboard sliding piece move calculation */
     // Given a square, returns an attack map of where the piece could attack (not including edge of board)
@@ -220,6 +218,9 @@ private:
 
     // Pre calculates knight and rook moves
     void InitLeaperMoves();
+
+    //Given a square and a color, calculates where that pawn could attack
+    U64 CalcPawnAttacks(int square, int side);
 
     // Given a square, calculates where the king could attack
     U64 CalcKingAttacks(int square);

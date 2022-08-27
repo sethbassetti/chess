@@ -1,3 +1,4 @@
+/*
 #include <vector>
 #include <string.h>
 #include <iostream>
@@ -10,7 +11,7 @@
 using namespace std;
 
 
-/* Starts the game by initializing the board and calling the play function */
+ Starts the game by initializing the board and calling the play function 
 void Game::Start()
 {
     Board game_board = Board("rnbqkbnr/p1pppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
@@ -18,7 +19,7 @@ void Game::Start()
     Play();
 }
 
-/* This handles the main game loop, reading user input and making AI moves */
+ This handles the main game loop, reading user input and making AI moves 
 void Game::Play(){
     // If the player chooses black, have the AI make the first move, then go into the game loop
     if(player_color == black){
@@ -33,12 +34,12 @@ void Game::Play(){
         UpdateGame();
         MakeAIMove();
         UpdateGame();
-        cout << Evaluate(game_board.GetPosition(), game_board.GetCurrentPlayer()) << endl;
+        cout << Evaluate(game_board, game_board.GetCurrentPlayer()) << endl;
     }
 }
 
 
-/* Prompts the user to select their starting color */
+ Prompts the user to select their starting color 
 int Game::GetPlayerColor(){
 
     string color_input;
@@ -167,7 +168,7 @@ int Game::NegaMax(int depth){
     if (depth == 0)
     {
         // If position is better for black, returns negative, 
-        return Evaluate(game_board.GetPosition(), game_board.GetCurrentPlayer());
+        return Evaluate(game_board, game_board.GetCurrentPlayer());
     }
 
     
@@ -181,4 +182,4 @@ int Game::NegaMax(int depth){
     }
 
     return max;
-}
+}*/

@@ -1,4 +1,6 @@
-#include <iostream>
+
+
+/*#include <iostream>
 #include <vector>
 #include <iostream>
 //#include <emscripten/bind.h>
@@ -33,11 +35,12 @@ void MakeAIMove(){
     board.MakeMove(moves[move_choice]);
 }
 
-/*
+
 EMSCRIPTEN_BINDINGS(my_module){
     emscripten::function("IsValidMove", &IsValidMove);
     emscripten::function("GetBoardPosition", &GetBoardPosition);
     emscripten::function("ResetBoard", &ResetBoard);
     emscripten::function("MakeAIMove", &MakeAIMove);
 }
+
 */
