@@ -30,33 +30,20 @@ public:
     // Constructor function for board that builds a board based on an FEN string
     Board(std::string fen_string);
 
-
-
     // Chooses a move via the start and end positions and calls the make move function
     int MakeMove(int move, int move_flag);
     
     /* Driver around the perft function for move generation */
-    void perft_driver();
+    void perft_driver(int depth);
 
-    
+    /* Displays the board in a human-readable format with ASCII pieces */
     void Display();
 
-    int perft(int depth);
-
-
-    //std::vector<Move> GenerateMoveList();
-
-    int GetCurrentPlayer();
-
-    int IsValidMove(int start, int end);
-
-    std::string GetBoardFEN();
-    bool IsSquareAttacked(int square, int color);
-
-    void GenerateMoves(MoveList* move_list);
+    
+    
 
 private:
-    
+    // Helper macro to copy the board state for copy/make approach
     #define copy_board()                                                                    \
         U64 pieces_copy[12], occupancies_copy[3];                                           \
         int turn_copy, enpassant_copy, castle_copy;                                         \
@@ -64,6 +51,7 @@ private:
         memcpy(occupancies_copy, occupancies, sizeof(occupancies));                         \
         turn_copy=turn_to_move, enpassant_copy=enpassant, castle_copy=castling_rights;  
 
+    // Helper macro to restore the board state for copy/make approach
     #define take_back()                                                                     \
         memcpy(pieces, pieces_copy, sizeof(pieces));                                        \
         memcpy(occupancies, occupancies_copy, sizeof(occupancies));                         \
@@ -82,24 +70,24 @@ private:
     // This stores castling rights
     int castling_rights;
 
-
     // Calculates and stores all of the pre-initialized attacks
     MoveCalc move_calc;
 
-
+    // Used to generate moves for pawns, and king castling. Adds them to the move list pointer
     void GenerateQuietPawnMoves(MoveList* move_list);
     void GenerateCastleMoves(MoveList* move_list);
     void GeneratePawnAttacks(MoveList* move_list);
 
+    // Function that adds a move to a move list struct and updates how many moves exist within it 
     void AddMove(MoveList *move_list, int move);
 
-   // std::vector<Move> ParseLegalMoves(std::vector<Move> move_list);
+    // Generates all possible moves based on the board state and adds them to the move list
+    void GenerateMoves(MoveList* move_list);
 
-    bool KingInCheck(int color);
+    // Returns true if the given square is being attacked by the given color side
+    bool IsSquareAttacked(int square, int color);
 
-    
+    // Helper function, inner loop of perft driver that recursively generates moves to a certain depth
+    int perft(int depth);
 
-    void ToggleMove();
-
-    void ParseFENColorCastling(std::string fen_string);
 };

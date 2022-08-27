@@ -640,6 +640,7 @@ void Board::AddMove(MoveList *move_list, int move){
 int Board::MakeMove(int move, int move_flag)
 {
 
+    
     // Used for looking at the correct side
     int offset = (turn_to_move) * 6;
     int enemy_offset = (turn_to_move ^ 1) * 6;
@@ -647,6 +648,10 @@ int Board::MakeMove(int move, int move_flag)
     // quiet moves
     if (move_flag == all_moves)
     {
+
+        // preserve board state in case we have to take it back
+        copy_board();
+
         // parse move
         int source_square = get_move_source(move);
         int target_square = get_move_target(move);
@@ -762,6 +767,20 @@ int Board::MakeMove(int move, int move_flag)
         occupancies[black] = pieces[p] | pieces[n] | pieces[r] | pieces[b] | pieces[q] | pieces[k];
         occupancies[both] = occupancies[white] | occupancies[black];
 
+        // Toggle the current side
+        turn_to_move ^= 1;
+
+        // If the king of the last color is under attack, this is an illegal move
+        if (IsSquareAttacked((turn_to_move == white) ? BitScan(pieces[k]) : BitScan(pieces[K]), turn_to_move))
+        {
+            // Take it back and return 0 for illegal move
+            take_back();
+            return 0;
+        }
+        else
+            // return 1 for legal move
+            return 1;
+
     }
 
     // capture moves
@@ -769,7 +788,7 @@ int Board::MakeMove(int move, int move_flag)
     {
         // If it is a capture move, make it
         if (get_move_capture(move))
-            MakeMove(move, all_moves);
+            return MakeMove(move, all_moves);
 
         // otherwise return 0
         else
@@ -778,7 +797,7 @@ int Board::MakeMove(int move, int move_flag)
 }
 
 
-void Board::perft_driver(){
+void Board::perft_driver(int depth){
     
     MoveList moves;
 
@@ -799,309 +818,14 @@ void Board::perft_driver(){
     }
 
 }
-/*
 
-void Board::GenerateKingMoves(vector<Move> &move_list){
-
-    int offset = turn_to_move * 6;
-    U64 king = position.pieces[white_king + offset];
-
-    vector<int> king_indices = SerializeBitboard(king);
-    FillMoveList(king_indices, king_attacks, move_list);
-
-    
-    // Generate castling moves for white
-    if(!turn_to_move){
-        // Kingside castling rights
-        if(castling_rights & wk){
-            if(!(wk_castle_occupancy & position.occupancy)){
-                Move castle_move = {king_indices.at(0), g1, castle};
-                move_list.push_back(castle_move);
-            }
-        }
-        // Queenside castling rights
-        if(castling_rights & wq){
-            if(!(wq_castle_occupancy & position.occupancy)){
-                Move castle_move = {king_indices.at(0), c1, castle};
-                move_list.push_back(castle_move);
-            }
-        }
-    }else{
-        // Kingside castling rights
-        if(castling_rights & bk){
-            if(!(bk_castle_occupancy & position.occupancy)){
-                Move castle_move = {king_indices.at(0), g8, castle};
-                move_list.push_back(castle_move);
-            }
-        }
-        // Queenside castling rights
-        if(castling_rights & bq){
-            if(!(bq_castle_occupancy & position.occupancy)){
-                Move castle_move = {king_indices.at(0), c8, castle};
-                move_list.push_back(castle_move);
-            }
-        }
-    }
-    
-}
-*/
-
-/*
-
-void Board::GenerateSliderMoves(vector<Move> &move_list){
-
-    int offset = turn_to_move * 6;
-
-    U64 queens = position.pieces[white_queen + offset];
-    U64 rooks = position.pieces[white_rook + offset];
-    U64 bishops = position.pieces[white_bishop + offset];
-
-    vector<int> queen_index = SerializeBitboard(queens);
-    vector<int> rook_index = SerializeBitboard(rooks);
-    vector<int> bishop_index = SerializeBitboard(bishops);
-
-    FillMoveList(queen_index, queen_attacks, move_list);
-    FillMoveList(rook_index, rook_attacks, move_list);
-    FillMoveList(bishop_index, bishop_attacks,  move_list);
-}
-
-void Board::FillMoveList(vector<int> piece_list, U64 attack_map[64], vector<Move> &move_list){
-
-    U64 color_pieces = position.colors[turn_to_move];
-    for (int piece : piece_list)
-    {
-        vector<int> targets = SerializeBitboard(attack_map[piece] & ~color_pieces);
-        for(int target : targets){
-            int captured_piece = position.GetPieceType(target);
-            Move move = {piece, target, quiet, captured_piece};
-            if (captured_piece)
-            {
-                move.move_type = capture;
-            }
-
-            move_list.push_back(move);
-        }
-    }
-}
-vector<Move> Board::GenerateMoveList(){
-
-    vector<U64> piece_bitboards;
-    vector<Move> move_list;
-    vector<Move> legal_moves;
-
-    // Adds all pawn moves for the color to the move list
-    GeneratePawnMoves(move_list);
-
-    // Adds all knight moves for the color to the move list
-    GenerateKnightMoves(move_list);
-
-    // Adds all king moves for the color to the move list
-    GenerateKingMoves(move_list);
-
-    GenerateSliderMoves(move_list);
-
-    legal_moves = ParseLegalMoves(move_list);
-
-    return legal_moves;
-}
-
- Parses the move list and returns a new move list with only legal moves. I.e. moves that do not put the king
-in check and valid castle moves (no intermediate squares under attack) 
-
-vector<Move> Board::ParseLegalMoves(vector<Move> move_list){
-
-    vector<Move> legal_moves;
-
-    // Iterate over the move list, only adding moves that are legal
-    for (Move move : move_list)
-    {
-
-        // If the move is a castle move, check that none of the squares the king moves through are under attack
-        if(move.move_type == castle){
-            if(IsSquareAttacked(move.start, turn_to_move) || IsSquareAttacked(move.end, turn_to_move) || IsSquareAttacked((move.start + move.end)/2, turn_to_move)){
-                continue;
-            }else{
-                legal_moves.push_back(move);
-                continue;
-            }
-        }
-
-        // Make the move and look if the king is in check. If not, add the move to the list, and unmake it
-        MakeMove(move);
-
-        // Since MakeMove() toggles the turn to move, toggle it again when calling the kingincheck() function
-        if(!KingInCheck(turn_to_move ^ 1)){
-            legal_moves.push_back(move);
-        }
-        UnMakeMove(move);
-    }
-
-    return legal_moves;
-}
-
- This function takes a move object and moves the necessary pieces on the board. It looks at the move type,
-such as castling, promotions, or en passants, and does the necessary board adjustments to accurately make that move.
-At the end of the function, it resets the board's position object to reflect the changes 
-void Board::MakeMove(Move move){
-
-    // Before making the move, store the board's game state so that this move can be unmade
-    gameState state = {position, castling_rights, enpassant};
-
-    // Stores the slider attacks so InitSliderAttacks() does not have to be called on unmake move
-    memcpy(state.queen_attacks, queen_attacks, sizeof(queen_attacks));
-    memcpy(state.rook_attacks, rook_attacks, sizeof(rook_attacks));
-    memcpy(state.bishop_attacks, bishop_attacks, sizeof(bishop_attacks));
-
-    // Pushes the state onto the game history stack
-    game_state_hist.push_back(state);
-
-    // Gets the type of piece being moved to update it's bitboard
-    int moving_piece_type = position.GetPieceType(move.start);
-
-
-    // Moves the piece to its ending position
-    MoveBit(position.pieces[moving_piece_type], move.start, move.end);
-    //pop_bit(position.pieces[moving_piece_type], move.start);
-
-    // If this is a capture, remove the captured piece from its bitboard
-    if(move.move_type == capture){
-        pop_bit(position.pieces[move.capture], move.end);
-
-    // If this is an en passant capture, calculate where the pawn that needs to be captured is, then remove it
-    }else if(move.move_type == ep_capture){
-        
-        // The offset looks at the piece behind the moving pawn to obtain the pawn to be captured
-        int offset = (turn_to_move == white) ? -8 : 8;
-        pop_bit(position.pieces[move.capture], (move.end + offset));
-    }
-
-    //If this is a promotion, remove the pawn from the last rank and replace it with the promotion choice
-    if(move.promo_piece){
-        pop_bit(position.pieces[moving_piece_type], move.end);
-        set_bit(position.pieces[move.promo_piece + turn_to_move * 6], move.end);
-    }
-
-    // If this move is a double pawn push, set the en passant square
-    if(move.move_type == double_pawn_push){
-        enpassant = (move.start + move.end) / 2;
-
-    // If it is not a double pawn push, reset the en passant square
-    }else{
-        enpassant = 0;
-    }
-
-    // If this move is a castle, determine what kind of castle, move the appropriate rook, and adjust castling rights
-    if(move.move_type == castle){
-        // Depending on how the king is castling, needs to move the correct rook
-        switch(move.end){
-            case g1:
-                MoveBit(position.pieces[white_rook], h1, f1);
-                break;
-            case c1:
-                MoveBit(position.pieces[white_rook], a1, d1);
-                break;
-            case c8:
-                MoveBit(position.pieces[black_rook], a8, d8);
-                break;
-            case g8:
-                MoveBit(position.pieces[black_rook], h8, f8);
-                break;
-        }
-    }
-    // Adjusts castling rights, if a king or rook moves
-    switch(moving_piece_type){
-        // If either of the kings move, take away castling rights for that color
-        case white_king:
-            castling_rights &= 12;
-            break;
-        case black_king:
-            castling_rights &= 3;
-            break;
-
-        // If a rook moves, look at the starting square to determine which side (king/queen) loses castling rights
-        case white_rook:
-            if(move.start == a1){
-                castling_rights &= 15 - wq;
-            }
-            else if(move.start == h1){
-                castling_rights &= 15 - wk;
-            }
-            break;
-
-        case black_rook:
-            if(move.start == a8){
-                castling_rights &= 15 - bq;
-            }else if(move.start == h8){
-                castling_rights &= 15 - bk;
-            }
-            break;
-        }
-
-    // Updates the position pieces
-    position.Update();
-    // Switches whose turn it is to play
-    ToggleMove();
-}
-
-Attempts to make a move with a starting and ending square, returns 1 if successful, 0 otherwise 
-int Board::MakeMove(int start, int end){
-    vector<Move> moves = GenerateMoveList();
-    for(Move move : moves){
-        if(start == move.start && end == move.end){
-            MakeMove(move);
-            return 1;
-        }
-    }
-    printf("Invalid Move!\n");
-    return 0;
-}
-
-
-Returns true if the king of the input color is being attacked by any other enemy piece 
-bool Board::KingInCheck(int color){
-    
-    // Offset determines what color of king to retrieve
-    int offset = 6 * color;
-    U64 king = position.pieces[white_king + offset];
-
-    // Retrieves the index of the king's location
-    int king_square = BitScan(king);
-
-
-    // If the king square is being attacked, return true, since it is in check
-    return IsSquareAttacked(king_square, color);
-}
 
 
 int Board::perft(int depth){
-    int nodes = 0;
-
-    if (depth == 0)
-    {
-        return 1;
-    }
-
-    vector<Move> moves = GenerateMoveList();
-    for (Move move : moves)
-    {
-        MakeMove(move);
-        
-        nodes += perft(depth - 1);
-        
-        
-        UnMakeMove(move);
-    }
-
-    return nodes;
-}
-*/
-
-/*
-void Board::ToggleMove(){
-    turn_to_move ^= 1;
+    
 }
 
- Displays the board in ASCII format */
+/* Displays the board in ASCII format */
 void Board::Display(){
 
     // ASCII characters for all of the board pieces
@@ -1153,19 +877,4 @@ void Board::Display(){
                                  ((castling_rights & bk) ? "bk | " : "") <<
                                  ((castling_rights & bq) ? "bq" : "") <<
                                  endl;
-
-
 }
-
-/*
-int Board::IsValidMove(int start, int end)
-{
-    vector<Move> moves = GenerateMoveList();
-    for(Move move : moves){
-        if(move.start == start && move.end == end){
-            MakeMove(move);
-            return true;
-        }
-    }
-    return false;
-}*/
