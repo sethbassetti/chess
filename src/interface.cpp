@@ -1,46 +1,61 @@
 
 
-/*#include <iostream>
+#include <iostream>
 #include <vector>
 #include <iostream>
-//#include <emscripten/bind.h>
+/*
+#include <emscripten/bind.h>
 #include "board.h"
 
-//using namespace emscripten;
-Board board;
+using namespace emscripten;
 
-int IsValidMove(int start, int end)
+// global board variable to keep track of game state
+Board board = Board();
+
+
+
+int MakeMove(int start, int end)
 {
-    vector<Move> moves = board.GenerateMoveList();
-    for(Move move : moves){
-        if(move.start == start && move.end == end){
-            board.MakeMove(move);
-            return true;
-        }
+    // init a move list
+    MoveList move_list;
+
+    // init a move variable to store each move
+    int move;
+
+    // populate the move list with moves
+    board.GenerateMoves(&move_list);
+
+    // iterate through each move
+    for(int i = 0; i < move_list.count; i++)
+    {   
+        PrintMove(move);
+        // retrieve the current move
+        move = move_list.moves[i];
+
+        // if there is a move whose start and end match the queried start and end, then it is a valid move and make that move
+        if((get_move_source(move) == start) && (get_move_target(move) == end))
+            return board.MakeMove(move, all_moves);
     }
-    return false;
+
+    return 0;
 }
 
-std::string GetBoardPosition(){
-    return board.GetBoardFEN();
+std::string MakeRandomMove()
+{
+    int move = board.GetRandomMove();
+
+    while (!board.MakeMove(move, all_moves))
+        move = board.GetRandomMove();
+
+
+    return PrintMove(move);
+
 }
 
-void ResetBoard(){
-    board = Board();
-}
-
-void MakeAIMove(){
-    vector<Move> moves = board.GenerateMoveList();
-    int move_choice = rand() % moves.size();
-    board.MakeMove(moves[move_choice]);
-}
 
 
 EMSCRIPTEN_BINDINGS(my_module){
-    emscripten::function("IsValidMove", &IsValidMove);
-    emscripten::function("GetBoardPosition", &GetBoardPosition);
-    emscripten::function("ResetBoard", &ResetBoard);
-    emscripten::function("MakeAIMove", &MakeAIMove);
+    emscripten::function("MakeMove", &MakeMove);
+    emscripten::function("MakeRandomMove", &MakeRandomMove);
 }
-
 */

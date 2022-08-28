@@ -24,31 +24,32 @@ function startGame() {
     currentColor = $("input[name='colorSelector']:checked").val();
     board.start('false');
     board.orientation(currentColor);
-  Module.ResetBoard();
 }
 
+/* Function that is called when a piece is dropped, checks if that move is a legal move and if so it makes that move */
 function onDrop(source, target, piece, newPos, oldPos, orientation) {
+
+  // Retrieves the integer square for the source and target
   var source_index = squareIndexes.indexOf(source);
   var target_index = squareIndexes.indexOf(target);
 
+  var valid_move = Module.MakeMove(source_index, target_index);
 
-    
-  if (!isLegalMove(source_index, target_index)) {
+  // Checks the board to see if the move is legal, if not it snaps the move back
+  if (!valid_move)
+  {
     return 'snapback'
-  } else {
-    Module.MakeAIMove();
-    
   }
-  console.log(Module.GetBoardPosition());
-  board.position(Module.GetBoardPosition(), false);   
 
+    
+  else
+  {
+    var move = Module.MakeRandomMove();
+    board.move(move);
+  }
+  
 }
 
-
-function isLegalMove(source, target, oldPosition) {
-  var validMove = Module.IsValidMove(source, target);
-  return validMove;
-}
 
 $(document).ready(function () {
     $("#setStartBtn").click(function () {

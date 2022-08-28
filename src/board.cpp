@@ -2,7 +2,8 @@
 #include <iostream>
 #include <stdio.h>
 #include <bitset>
-#include <bits/stdc++.h>
+#include <sstream>
+#include <string>
 #include <strings.h>
 #include <string.h>
 #include <assert.h>  
@@ -509,7 +510,7 @@ void Board::GenerateCastleMoves(MoveList *move_list)
         if(castling_rights & wq)
         {
              // Make sure there are no squares blocking the castle
-            if (!get_bit(occupancies[both], c1) && !get_bit(occupancies[both], d1))
+            if (!get_bit(occupancies[both], c1) && !get_bit(occupancies[both], d1) && !get_bit(occupancies[both], b1))
             {
                 // Make sure king does not move through an attacked square (and is not in check already)
                 if (!IsSquareAttacked(d1, black) && !(IsSquareAttacked(e1, black))){
@@ -540,7 +541,7 @@ void Board::GenerateCastleMoves(MoveList *move_list)
         if(castling_rights & bq)
         {
              // Make sure there are no squares blocking the castle
-            if (!get_bit(occupancies[both], c8) && !get_bit(occupancies[both], d8))
+            if (!get_bit(occupancies[both], c8) && !get_bit(occupancies[both], d8) && !get_bit(occupancies[both], b8))
             {
                 // Make sure king does not move through an attacked square (and is not in check already)
                 if (!IsSquareAttacked(d8, white) && !(IsSquareAttacked(e8, white))){
@@ -583,7 +584,7 @@ void Board::GeneratePawnAttacks(MoveList* move_list)
 
         // Retrieve the attacks from the current turn's side that can hit an enemy
         // Adds the en passant square to the move to indicate that it can move (if enpassant is available)
-        attacks = move_calc.pawn_attacks[turn_to_move][source_square] & (occupancies[enemy] | (1ULL << enpassant));
+        attacks = move_calc.pawn_attacks[turn_to_move][source_square] & occupancies[enemy];
 
         
 
@@ -619,6 +620,26 @@ void Board::GeneratePawnAttacks(MoveList* move_list)
             // Pop bit off attacks bitboard
             pop_bit(attacks, target_square);
         }
+
+        // generate en passant captures
+        if (enpassant != no_sq)
+        {   
+            // generate the square that the pawn can attack
+            U64 enpassant_attacks = move_calc.pawn_attacks[turn_to_move][source_square] & (1ULL << enpassant);
+
+
+            // if there is an en passant attack square
+            if (enpassant_attacks)
+            {   
+                // get the target square
+                target_square = BitScan(enpassant_attacks);
+
+                // encode the move and add it to the list
+                move = encode_move(source_square, target_square, (P + offset), 0, 0, 0, 1, 0);
+                AddMove(move_list, move);
+            }
+        }
+
         pop_bit(bitboard, source_square);
 
 
@@ -703,7 +724,6 @@ int Board::MakeMove(int move, int move_flag)
         // Handle en passant moves
         if (enpass)
         {
-            cout << square_index[target_square] << endl;
             // If white's turn, remove black pawn at the appropriate spot, otherwise remove white pawn
             (turn_to_move == white) ? (pop_bit(pieces[p], (target_square - 8))) : (pop_bit(pieces[P], (target_square + 8)));
 
@@ -728,39 +748,31 @@ int Board::MakeMove(int move, int move_flag)
                     // Move H rook
                     pop_bit(pieces[R], h1);
                     set_bit(pieces[R], f1);
-
-                    // update castling rights so white can't castle
-                    castling_rights &= ~(wk | wq);
                     break;
 
                 case (c1):
                     // Move A rook
                     pop_bit(pieces[R], a1);
-                    set_bit(pieces[R], d1);
-
-                    // update castling rights so white can't castle
-                    castling_rights &= ~(wk | wq);       
+                    set_bit(pieces[R], d1);   
                     break;
 
                 case (g8):
                     // Move H rook
                     pop_bit(pieces[r], h8);
                     set_bit(pieces[r], f8);
-
-                    // update castling rights so black can't castle
-                    castling_rights &= ~(bk | bq);
                     break;
                 
                 case (c8):
                     // Move A Rook
                     pop_bit(pieces[r], a8);
                     set_bit(pieces[r], d8);
-
-                    // update castling rights so black can't castle
-                    castling_rights &= ~(bk | bq);
                     break;
             }
         }
+
+        // update castling rights if either a rook or the king moves or a rook is captured
+        castling_rights &= board_castling_rights[source_square];
+        castling_rights &= board_castling_rights[target_square];
 
         // Re-initialize the occupancies bitboards after a move has been made
         occupancies[white] = pieces[P] | pieces[N] | pieces[R] | pieces[B] | pieces[Q] | pieces[K];
@@ -796,33 +808,191 @@ int Board::MakeMove(int move, int move_flag)
     }
 }
 
-
+/* Performance test driver, calls the recursive perft function to generate all moves to a given depth
+and record the time taken to generate those moves */
 void Board::perft_driver(int depth){
     
+    // initialize a clock to keep track of the time it takes to search
+    clock_t time_elapsed;
+
+    // get the starting time
+    time_elapsed = clock();
+
+    // init the list of moves
     MoveList moves;
 
+    // init num of nodes searched
+    int nodes = 0;
+
+    // init number of nodes searched for every move
+    int move_nodes;
+
+    // generate all moves for this board state
     GenerateMoves(&moves);
 
+    // iterate over every move
     for (int i = 0; i < moves.count; i++){
+
+        // grab the move from the MoveList object
         int move = moves.moves[i];
 
+        // copy the board to restore move later
         copy_board();
-        getchar();
-        Display();
-        MakeMove(move, all_moves);
-        getchar();
-        Display();
 
+        // make the move. If it is an illegal move, then continue to the next move
+        if(!MakeMove(move, all_moves)){
+           // PrintMove(move);
+            continue;
+
+
+        }
+            
+        // recursively call the perft function for a depth of -1
+        move_nodes = perft(depth-1);
+
+        // print out the move and it's nodes for perft divide debugging purposes
+        cout << square_index[get_move_source(move)] << square_index[get_move_target(move)] <<
+            promoted_pieces[get_move_promoted(move)] << ": " << move_nodes << endl;
+
+        // increment total nodes
+        nodes += move_nodes;
+
+        // restore the board state
         take_back();
 
     }
 
+    // get the ending time
+    time_elapsed = clock() - time_elapsed;
+    float seconds = (float) time_elapsed / CLOCKS_PER_SEC;
+    float seconds_per_mil_nodes = nodes / 1000000 / seconds;
+
+    cout << "nodes searched: " << nodes  << endl;
+    cout << "total time: " << seconds <<  " seconds" << endl;
+    cout << seconds_per_mil_nodes << " million nodes per second" << endl;
+
+}
+
+// Generates a random legal move and returns it
+int Board::GetRandomMove()
+{
+    // init move list
+    MoveList move_list;
+
+    // populate move list with moves
+    GenerateMoves(&move_list);
+
+    // Sets the random number generator to seed with the current system time
+    srand(time(0));
+
+    // get a random index from the moves generated
+    int random_index = rand() % move_list.count;
+
+    // return a random move
+    return move_list.moves[random_index];
 }
 
 
-
+/* Recursive perft function to traverse the tree of moves to a given depth */
 int Board::perft(int depth){
+
+    // If the depth is 0, we reached a leaf node so return 1
+    if (depth == 0) 
+        return 1;
+
+    // otherwise search through all of the nodes in this tree
+    else
+    {
+        // init the list of moves
+        MoveList moves;
+
+        // init num of nodes searched
+        int nodes = 0;
+
+        // generate all moves for this board state
+        GenerateMoves(&moves);
+
+        // iterate over every move
+        for (int i = 0; i < moves.count; i++){
+            
+
+            // grab the move from the MoveList object
+            int move = moves.moves[i];
+
+            // copy the board to restore move later
+            copy_board();
+
+            // make the move. If it is an illegal move, then continue
+            if(!MakeMove(move, all_moves))
+                continue;
+
+            // recursively call the perft function for a depth of -1
+            nodes += perft(depth-1);
+
+            // restore the board state
+            take_back();
+        }
+
+        return nodes;
+
+    }
+
     
+    
+}
+
+/* Evaluates the board state using a number of factors, but mainly material advantage */
+int Board::Evaluate()
+{
+    // Contains relative scores for each piece
+    const int material_scores[12] = {100, 300, 350, 500, 1000, 10000, -100, -300, -350, -500, -1000, -10000};
+
+    // init the evaluation score for the board
+    int score = 0;
+
+    // init bitboard variable to store piece and square variable to store squares
+    U64 bitboard;
+    int square;
+
+    // Iterates over every piece
+    for(int piece=P; piece <= k; piece++)
+    {   
+        // retrieve the piece bitboard
+        bitboard = pieces[piece];
+        // iterate over every bit
+        while (bitboard)
+        {
+            // scans for the LS1B
+            square = BitScan(bitboard);
+            
+            // adds the material score to overall score
+            score += material_scores[piece];
+
+            // score positional piece scores
+            switch(piece)
+            {
+                // evaluate white pieces
+                case P: score += pawn_scores[square]; break;
+                case N: score += knight_scores[square]; break;
+                case B: score += bishop_scores[square]; break;
+                case R: score += rook_scores[square]; break;
+                case K: score += king_scores[square]; break;
+
+                // evaluate black pieces
+                case p: score -= pawn_scores[mirror_scores[square]]; break;
+                case n: score -= knight_scores[mirror_scores[square]]; break;
+                case b: score -= bishop_scores[mirror_scores[square]]; break;
+                case r: score -= rook_scores[mirror_scores[square]]; break;
+                case k: score -= king_scores[mirror_scores[square]]; break;
+            }
+            // pops bit from the bitboard
+            pop_bit(bitboard, square);
+        }
+    }
+
+
+    // If white, return the score, otherwise return -score so that it is always relative to current side's move
+    return (turn_to_move == white) ? score : -score;
 }
 
 /* Displays the board in ASCII format */

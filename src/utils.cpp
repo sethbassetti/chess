@@ -80,14 +80,11 @@ void PrintBoard(U64 bitboard){
 }
 
 /* Prints out the move as source - target - promoted piece */
-void PrintMove(int move){
+string PrintMove(int move){
 
-    cout << piece_to_str[get_move_piece(move)]  \
-         << ((get_move_capture(move)) ? " capture" : "") \
-         << ": " << square_index[get_move_source(move)] \
-         << square_index[get_move_target(move)] \
-         << promoted_pieces[get_move_promoted(move)] \
-         << endl;
+    string move_str = square_index[(get_move_source(move))] + "-" + square_index[get_move_target(move)];
+    cout <<  move_str << endl;
+    return move_str;
 }
 
 void MoveBit(U64 &bitboard, int start, int end){

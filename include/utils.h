@@ -48,10 +48,10 @@ const std::string piece_to_str[12] = {
 
 const std::string promoted_pieces[12] = {
     "",
-    "N",
-    "B",
-    "R",
-    "Q",
+    "n",
+    "b",
+    "r",
+    "q",
     "",
     "",
     "n",
@@ -168,7 +168,7 @@ std::vector<int> SerializeBitboard(U64 Bitboard);
 // Prints out the bitboard in a pretty format
 void PrintBoard(U64 bitboard);
 
-void PrintMove(int move);
+std::string PrintMove(int move);
 
 void MoveBit(U64 &bitboard, int start, int end);
 

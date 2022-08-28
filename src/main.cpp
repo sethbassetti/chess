@@ -1,28 +1,21 @@
 #include<iostream>
 #include <stdlib.h>
-#include "game.h"
+
+
 #include "move_calc.h"
 #include "utils.h"
+#include "board.h"
+
 using namespace std;
 
-
-
-
-
 int main(){
-    /*
-    Game game;
-    game.Start();
     
-    printf("This is running\n");
-    */
+    Board game_board = Board("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1");
 
-    //MoveCalc calc = MoveCalc();
-    Board game_board = Board("r3kb1r/pppp1pPp/8/3Pp3/8/3B1N2/PPP2PPP/R3K2R w KQkq e6 0 1");
     game_board.Display();
-    
-    game_board.perft_driver();
+    cout << game_board.Evaluate() << endl;
+    //PrintMove(game_board.GetRandomMove());
 
-    //U64 occupancy = 0ULL;
 
 }
+
