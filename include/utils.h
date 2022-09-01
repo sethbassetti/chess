@@ -32,18 +32,18 @@ const std::string square_index[64] = {"a1", "b1", "c1", "d1", "e1", "f1", "g1", 
 
 // Array used to convert a piece int to the str representation
 const std::string piece_to_str[12] = {
-    "white pawn",
-    "white knight",
-    "white bishop",
-    "white rook",
-    "white queen",
-    "white king",
-    "black pawn",
-    "black knight",
-    "black bishop",
-    "black rook",
-    "black queen",
-    "black king"
+    "P",
+    "N",
+    "B",
+    "R",
+    "Q",
+    "K",
+    "p",
+    "n",
+    "b",
+    "r",
+    "q",
+    "k"
 };
 
 const std::string promoted_pieces[12] = {

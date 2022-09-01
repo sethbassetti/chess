@@ -351,7 +351,7 @@ void Board::GenerateMoves(MoveList *move_list)
 }
 
 /* Generates all pawn pushes (single and double) moves, including promotions */
-void Board::GenerateQuietPawnMoves(MoveList *move_list)
+void inline Board::GenerateQuietPawnMoves(MoveList *move_list)
 {
 
     // Initialize a variable to hold the source square and target square
@@ -484,7 +484,7 @@ void Board::GenerateQuietPawnMoves(MoveList *move_list)
     }
 }
 
-void Board::GenerateCastleMoves(MoveList *move_list)
+void inline Board::GenerateCastleMoves(MoveList *move_list)
 {
 
     // stores the move
@@ -557,7 +557,7 @@ void Board::GenerateCastleMoves(MoveList *move_list)
 }
 
 /* Generates all possible pawn capture moves */
-void Board::GeneratePawnAttacks(MoveList* move_list)
+void inline Board::GeneratePawnAttacks(MoveList* move_list)
 {
 
     // init source and target squares as well as attack and source bitboards
@@ -892,6 +892,191 @@ int Board::GetRandomMove()
     return move_list.moves[random_index];
 }
 
+// Generates the best possible move searching through a certain depth
+int Board::GetBestMove(int depth)
+{
+
+    // init best move and move list
+    int best_move;
+    MoveList move_list;
+
+    // init a score variable
+    int score;
+
+    // initialize a best score (very low to start with)
+    int best_score = -10000;
+
+    // populates the move list with pseudo-legal moves
+    GenerateMoves(&move_list);
+
+    // iterate over every move
+    for (int count=0; count < move_list.count; count++)
+    {
+        // copy the board state
+        copy_board();
+
+        // if this move is not valid
+        if (!MakeMove(move_list.moves[count], all_moves))
+        {
+            // continue to next move
+            continue;
+        }
+        
+        // Call the recursive negamax function to get the score of this move
+        score = -NegaMax(-50000, 50000, depth - 1);
+
+        // if the score is the best so far
+        if (score > best_score)
+        {   
+            // update current best move and best score
+            best_move = move_list.moves[count];
+            best_score = score;
+        }
+
+        // preserve board state
+        take_back();
+
+
+    }
+
+    // Return the best move found
+    return best_move;
+
+}
+
+int Board::Quiescence(int alpha, int beta)
+{
+
+    // evaluate position
+    int evaluation = Evaluate();
+
+    // fail-hard beta cautoff
+    if (evaluation >= beta)
+        return beta;
+
+    // found a better move
+    if (evaluation > alpha)
+    {
+        alpha = evaluation;
+    }
+
+
+    // init move list
+    MoveList move_list;
+
+    // populate move list with moves
+    GenerateMoves(&move_list);
+
+    // iterate over every move
+    for (int count = 0; count < move_list.count; count++)
+    {
+        // copy board state
+        copy_board();
+
+        // if this move is not valid
+        if (!MakeMove(move_list.moves[count], only_captures))
+            // continue to next move
+            continue;
+
+        // recursively get score from negamax function
+        int score = -Quiescence(-beta, -alpha);
+
+        // fail-hard beta cautoff
+        if (score >= beta)
+            return beta;
+
+        // found a better move
+        if (score > alpha)
+        {
+            alpha = score;
+        }
+
+        // restore board state
+        take_back();
+    }
+
+    // node fails low
+    return alpha;
+
+}
+
+// The negamax (modified minimax) algorithm to search for a move with alpha beta pruning
+int Board::NegaMax(int alpha, int beta, int depth)
+{
+
+    // if at the base depth (base case)
+    if (depth == 0){
+        // return quiescence search
+        return Quiescence(alpha, beta);
+    }
+
+    // determine if the king is in check or note
+    bool in_check = IsSquareAttacked((turn_to_move == white) ? BitScan(pieces[K]) : BitScan(pieces[k]), turn_to_move ^ 1);
+
+    // count number of legal moves
+    int legal_moves = 0;
+
+    // init best score and score variables
+    int best_score = -50000;
+    int score;
+
+    // init move list
+    MoveList move_list;
+
+    // populate move list with moves
+    GenerateMoves(&move_list);
+
+    // iterate over every move
+    for (int count = 0; count < move_list.count; count++)
+    {
+        // copy board state
+        copy_board();
+
+        // if this move is not valid
+        if (!MakeMove(move_list.moves[count], all_moves))
+            // continue to next move
+            continue;
+
+        // increment number of legal moves
+        legal_moves++;
+        
+        // recursively get score from negamax function
+        score = -NegaMax(-beta, -alpha, depth - 1);
+
+        // fail-hard beta cautoff
+        if (score >= beta)
+            return beta;
+
+        if (score > alpha)
+        {
+            alpha = score;
+        }
+
+
+
+        
+
+        // restore board state
+        take_back();
+    }
+
+    // no legal moves to make in this position
+    if (legal_moves == 0)   
+    {
+        // king is in check
+        if (in_check)
+            // return mating score (10-depth is so that it finds sooner checkmates)
+            return -49000 - (10-depth);
+        else
+            // return stalemate score
+            return 0;
+    }
+
+    
+    return alpha;
+
+}
+
 
 /* Recursive perft function to traverse the tree of moves to a given depth */
 int Board::perft(int depth){
@@ -991,9 +1176,84 @@ int Board::Evaluate()
     }
 
 
-    // If white, return the score, otherwise return -score so that it is always relative to current side's move
+    // If white, return the score, otherwise return -score so that it is always relatively positive to current side's move
     return (turn_to_move == white) ? score : -score;
 }
+
+/* Calls the board's constructor to reset it to the original start position */
+void Board::Reset(){
+    Board();
+}
+
+string Board::GenerateFEN(){
+
+    // init fen string to build the str
+    string fen_string;
+    
+    // init str to hold str repr of pieces
+    string piece_str = "";
+
+    // Iterate over every rank from top to bottom
+    for (int rank = 7; rank >= 0; rank--){
+
+        // init a counter to count unoccupied spots on the board within a rank
+        int empty_counter = 0;
+
+        // iterate over files from a-h
+        for (int file = 0; file < 8; file++)
+        {
+
+            // get the square index
+            int square = rank * 8 + file;
+
+            // iterate over every piece type
+            for (int piece = P; piece <= k; piece++)
+            {
+
+                // if the bit on this square is occupied, it is of type piece
+                if (get_bit(pieces[piece], square)){
+                    piece_str = piece_to_str[piece];
+                }
+            }
+
+
+            // if a piece was found 
+            if(piece_str != "") 
+            {
+
+                // if empty counter is greater than 0
+                if(empty_counter)
+                {
+
+                    // push back the count of empty pieces to the fen string and reset the counter
+                    fen_string.append(to_string(empty_counter));
+                    empty_counter = 0;
+                }
+
+                // append the piece to the fen string and reset it to a blank
+                fen_string.append(piece_str);
+                piece_str = "";
+            }
+            
+            // otherwise, if no piece was found, then increment the empty counter
+            else
+            {
+                empty_counter++;
+            }
+        }
+
+        // if empty counter has  a value at the end of the rank, append the value to the string
+        if(empty_counter)
+            fen_string.append(to_string(empty_counter));
+        
+        // if the rank isn't the last rank, then add the slash (rank divider)
+        if(rank != 0)
+            fen_string.append("/");
+        
+
+    }
+    return fen_string;
+} 
 
 /* Displays the board in ASCII format */
 void Board::Display(){

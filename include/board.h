@@ -20,6 +20,9 @@ public:
     // Generates all possible moves and chooses a random one
     int GetRandomMove();
 
+    // Generates the best possible move after searching to a given depth
+    int GetBestMove(int depth);
+
     // Chooses a move via the start and end positions and calls the make move function
     int MakeMove(int move, int move_flag);
 
@@ -31,6 +34,12 @@ public:
 
     /* Displays the board in a human-readable format with ASCII pieces */
     void Display();
+
+    /* Resets the board's game state to the starting position */
+    void Reset();
+
+    /* Generates a FEN string representing the current game state of the board */
+    std::string GenerateFEN();
 
     // Evaluates the current state of the board and returns a number indicating which side has an advantage
     int Evaluate();
@@ -99,9 +108,11 @@ private:
     // Helper function, inner loop of perft driver that recursively generates moves to a certain depth
     int perft(int depth);
 
+    // Negamax search function with alpha beta pruning. Returns best move found
+    int NegaMax(int alpha, int beta, int depth);
 
-
-    
+    // Quiescence search, searches capture moves until reaching a calm position
+    int Quiescence(int alpha, int beta);
 
     /***
      * Tables used for positional piece evaluation 

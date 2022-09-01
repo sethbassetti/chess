@@ -6,31 +6,37 @@
   <title>Spaghetti Chess</title>
   <link rel="stylesheet" href="css/chessboard-1.0.0.min.css">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="img/favicon-32x32.png">
   
-<script src="js/jquery-3.6.0.js"></script>
-<script src="../a.out.js"></script>
-<script src="js/chessboard-1.0.0.min.js"></script>
-<script src="js/chess.js"></script>
 
-<script>
-    Module.onRuntimeInitialized = _ => {
-        
-    }
-</script>
+
 </head>
 <body onload="initBoard()">
 
 <div id="Game">
-    <div id="board"></div>
+
+
+        <div id="board"></div>
+
 
     <div id="ui">
-        <h1> <center>Game Settings</center></h1>
+        <h1 class="ui-title"> <center>Spaghetti Chess</center></h1>
         <input type="radio" name="colorSelector" id="white" value="white" checked>
         <label for="white">White</label>
         <input type="radio" name="colorSelector" id="black" value="black">
         <label for="black">Black</label>
-    </br>
-        <button id="setStartBtn">Start Position</button>
+
+        
+        
+        <div class="slidecontainer depth-slider">
+            <h1> Depth Searched: </h1> 
+            <h2 id="depth-text">4</h2>
+            <input type="range" min="1" max="4" value="1" class="slider" id="myRange">
+        </div>
+
+    <!-- Start button-->
+        <button id="setStartBtn" class="start-btn" onclick="startGame()">Start Position</button>
+        <br>
         <p></p>
 
     </div>
@@ -40,5 +46,12 @@
 
 
 
+<script src="js/jquery-3.6.0.js"></script>
+<script src="../a.out.js"></script>
+<script src="js/chess.js"></script>
+<script src="js/chessboard-1.0.0.js"></script>
+<script src="js/chess_main.js"></script>
 </body>
+
+
 </html>

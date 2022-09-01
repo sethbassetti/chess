@@ -58,7 +58,7 @@ private:
     /* Magic numbers for rooks and bishops, these numbers are used to obtain an index for pre-calculated
     sliding piece attacks */
     const U64 rook_magic_numbers[64] = {
-         0x2080002010804002ULL,
+        0x2080002010804002ULL,
         0x30c0011000402001ULL,
         0x4700084010200100ULL,
         0x500050020100008ULL,
