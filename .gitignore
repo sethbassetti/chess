@@ -2,3 +2,5 @@
 .vscode
 # ignore compiled code
 bin
+
+*.wasm

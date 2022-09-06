@@ -16,10 +16,6 @@ const U64 not_gh_file = 0x3f3f3f3f3f3f3f3fULL;  // All 1's except gh files
 const U64 rank4 = 0x00000000FF000000ULL;        // All 1's on rank 4
 const U64 rank5 = 0x000000FF00000000ULL;        // All 1's on rank 5
 const U64 first_last_ranks = 0xff000000000000ffULL; // 1's on the bottom and top ranks
-const U64 wk_castle_occupancy = 0x60ULL; // Squares set in between white rook and king
-const U64 wq_castle_occupancy = 0xeULL;  // Squares set in between white rook and king for queenside castle
-const U64 bk_castle_occupancy = 0x6000000000000000ULL; // Squares set in between black rook and king/kingside castle
-const U64 bq_castle_occupancy = 0xe00000000000000ULL; // Squares set in between black rook and king for queenside castle
 
 const std::string square_index[64] = {"a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
                                             "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
@@ -160,18 +156,7 @@ enum {all_moves, only_captures};
 #define get_move_castling(move) (move & 0x800000)
 
 // Helper functions that finds index of LSB
-int BitScan(U64 bitboard, bool reverse=false);
+int BitScan(U64 bitboard);
 
-// Returns a vector of every index in the bitboard that is set to 1
-std::vector<int> SerializeBitboard(U64 Bitboard);
-
-// Prints out the bitboard in a pretty format
-void PrintBoard(U64 bitboard);
-
+// Prints a move to stdout and also returns that move
 std::string PrintMove(int move);
-
-void MoveBit(U64 &bitboard, int start, int end);
-
-int GetIndexFromSquare(char *square);
-
-U64 GenerateMagicCandidate();

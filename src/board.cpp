@@ -54,9 +54,17 @@ Board::Board(){
     castling_rights = wk | wq | bk | bq;
 }
 
+/* Initializes a board with an FEN String by calling the SetFEN function */
+Board::Board(string fen_string)
+{
+    // Uses the fen string to init all board state variables
+    SetFEN(fen_string);
+}
+
+
 /* Given some fen string, this function will initialize a board based on that string, set the board position and set
 en passant/castling rights */
-Board::Board(string fen_string){
+void Board::SetFEN(string fen_string){
 
     // Initialize the piece and occupancy bitboards as empty as empty
     for (int i = 0; i < 12; i++)    pieces[i] = 0ULL;
@@ -148,7 +156,7 @@ Board::Board(string fen_string){
     }
 
     fen_split >> field; // Pushes the en passant info into the field
-
+    
     // Iterates through every square
     for (int i = 0; i < 64; i++){
 
@@ -161,6 +169,63 @@ Board::Board(string fen_string){
     occupancies[black] = pieces[p] | pieces[n] | pieces[b] | pieces[r] | pieces[q] | pieces[k];
     occupancies[both] = occupancies[white] | occupancies[black];
 }
+
+
+/* Makes a move given a string (e5e6) and returns whether the move is valid or invalid */
+bool Board::MakeMove(string move)
+{
+    // init values for the source square, target square, and promotion (if applicable)
+    int source, target, promotion;
+
+    // iterate through every square
+    for (int i = 0; i < 64; i++)
+    {
+        // if the square string notation is equal to first two characters of move, set source to that square
+        if (square_index[i] == move.substr(0, 2)) source = i;
+
+        // if square string notation == 3rd and 4th characters of move, set target square
+        if (square_index[i] == move.substr(2, 2)) target = i;
+    }
+
+    // if move has 5 characters (indicating promotion piece)
+    if (move.length() == 5){
+
+        // iterate through all pieces
+        for (int piece = P; piece <= k; piece++)
+        {
+            // if the promoted piece == the character in the move, set the promotion piece
+            if (promoted_pieces[piece] == move.substr(4, 1)) promotion = piece;
+        }
+    }
+    // otherwise set promotion to 0
+    else promotion = 0;
+
+    // init a list of moves
+    MoveList move_list;
+
+
+    // populate the move list
+    GenerateMoves(&move_list);
+
+    // iterate through the moves
+    for (int count = 0; count < move_list.count; count++)
+    {
+        // retrieve the move
+        int move = move_list.moves[count];
+        
+        // if the move matches the given source, target, and promotion, then make the move
+        if (get_move_source(move) == source && get_move_target(move) == target && get_move_promoted(move) == promotion)
+        {
+            // return the value of make move (1 for legal, 0 for non-legal)
+            return MakeMove(move, all_moves);
+        }
+
+    }
+
+    // if none of the moves match, then return false
+    return false;
+}
+
 
 /* Given a square, checks if that square is attacked by a given side (white or black) */
 bool Board::IsSquareAttacked(int square, int side)
@@ -206,10 +271,8 @@ void Board::GenerateMoves(MoveList *move_list)
     // init a bitboard to hold current piece as well as all of it's attacks
     U64 bitboard, attacks;
 
-    // Generates castling moves, pawn pushes, and pawn attacks in their own functions since they are tricky to generate
-    GenerateCastleMoves(move_list);
-    GenerateQuietPawnMoves(move_list);
-    GeneratePawnAttacks(move_list);
+    // declare a move variable to hold moves
+    int move;
 
 
     /**** Knight Moves ****/
@@ -230,7 +293,7 @@ void Board::GenerateMoves(MoveList *move_list)
             target_square = BitScan(attacks);
 
             // Construct the move and add it to the list
-            int move = encode_move(source_square, target_square, (N + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            move = encode_move(source_square, target_square, (N + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
             AddMove(move_list, move);
             
             // pop after move is generated
@@ -257,7 +320,7 @@ void Board::GenerateMoves(MoveList *move_list)
             target_square = BitScan(attacks);
 
             // Construct the move and add it to the list
-            int move = encode_move(source_square, target_square, (R + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            move = encode_move(source_square, target_square, (R + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
             AddMove(move_list, move);
             
             // pop after move is generated
@@ -284,7 +347,7 @@ void Board::GenerateMoves(MoveList *move_list)
             target_square = BitScan(attacks);
 
             // Construct the move and add it to the list
-            int move = encode_move(source_square, target_square, (B + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            move = encode_move(source_square, target_square, (B + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
             AddMove(move_list, move);
             
             // pop after move is generated
@@ -311,7 +374,7 @@ void Board::GenerateMoves(MoveList *move_list)
             target_square = BitScan(attacks);
 
             // Construct the move and add it to the list
-            int move = encode_move(source_square, target_square, (Q + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            move = encode_move(source_square, target_square, (Q + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
             AddMove(move_list, move);
             
             // pop after move is generated
@@ -338,7 +401,7 @@ void Board::GenerateMoves(MoveList *move_list)
             target_square = BitScan(attacks);
 
             // Construct the move and add it to the list
-            int move = encode_move(source_square, target_square, (K + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            move = encode_move(source_square, target_square, (K + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
             AddMove(move_list, move);
             
             // pop after move is generated
@@ -348,20 +411,9 @@ void Board::GenerateMoves(MoveList *move_list)
         // pop bit after 
         pop_bit(bitboard, source_square);
     }
-}
 
-/* Generates all pawn pushes (single and double) moves, including promotions */
-void inline Board::GenerateQuietPawnMoves(MoveList *move_list)
-{
-
-    // Initialize a variable to hold the source square and target square
-    int source_square, target_square;
+    /*** Quiet Pawn Moves ***/
     
-    // Initialize a move variable to contain the moves
-    int move;
-
-    // This will hold the pawn pieces
-    U64 bitboard;
 
     // If turn to move is white, generate white pawn piece moves
     if (turn_to_move == white)
@@ -482,14 +534,8 @@ void inline Board::GenerateQuietPawnMoves(MoveList *move_list)
             pop_bit(black_pawn_double_targets, target_square);
         }
     }
-}
 
-void inline Board::GenerateCastleMoves(MoveList *move_list)
-{
-
-    // stores the move
-    int move;
-
+    /*** Castle Moves ***/
     // Generate white side castling moves
     if (turn_to_move == white)
     {
@@ -552,29 +598,9 @@ void inline Board::GenerateCastleMoves(MoveList *move_list)
         }
     }
 
-        
-
-}
-
-/* Generates all possible pawn capture moves */
-void inline Board::GeneratePawnAttacks(MoveList* move_list)
-{
-
-    // init source and target squares as well as attack and source bitboards
-    int source_square, target_square;
-    U64 bitboard, attacks;
-
-    // init move variable to store move
-    int move;
-
-    // define the color of the enemy pieces
-    int enemy = turn_to_move ^ 1;
-
-    // define an offset to determine the appropriately colored piece
-    int offset = turn_to_move * 6;
-
+    /*** Pawn attacks ***/
     // Define which source pawns we are going to use, depending on side
-    bitboard = (turn_to_move  == white) ? pieces[P] : pieces[p];
+    bitboard = pieces[P + offset];
 
     // Iterate over the source squares
     while(bitboard)
@@ -645,6 +671,7 @@ void inline Board::GeneratePawnAttacks(MoveList* move_list)
 
     }
 }
+
 
 /* Adds a move to the given move list */
 void Board::AddMove(MoveList *move_list, int move){
@@ -841,7 +868,6 @@ void Board::perft_driver(int depth){
 
         // make the move. If it is an illegal move, then continue to the next move
         if(!MakeMove(move, all_moves)){
-           // PrintMove(move);
             continue;
 
 
@@ -904,7 +930,7 @@ int Board::GetBestMove(int depth)
     int score;
 
     // initialize a best score (very low to start with)
-    int best_score = -10000;
+    int best_score = -100000;
 
     // populates the move list with pseudo-legal moves
     GenerateMoves(&move_list);
@@ -1007,7 +1033,7 @@ int Board::NegaMax(int alpha, int beta, int depth)
     // if at the base depth (base case)
     if (depth == 0){
         // return quiescence search
-        return Quiescence(alpha, beta);
+        return Evaluate();
     }
 
     // determine if the king is in check or note
@@ -1017,7 +1043,6 @@ int Board::NegaMax(int alpha, int beta, int depth)
     int legal_moves = 0;
 
     // init best score and score variables
-    int best_score = -50000;
     int score;
 
     // init move list
@@ -1047,14 +1072,7 @@ int Board::NegaMax(int alpha, int beta, int depth)
         if (score >= beta)
             return beta;
 
-        if (score > alpha)
-        {
-            alpha = score;
-        }
-
-
-
-        
+        alpha = max(score, alpha);
 
         // restore board state
         take_back();
@@ -1066,7 +1084,7 @@ int Board::NegaMax(int alpha, int beta, int depth)
         // king is in check
         if (in_check)
             // return mating score (10-depth is so that it finds sooner checkmates)
-            return -49000 - (10-depth);
+            return -49000 - (10 - depth);
         else
             // return stalemate score
             return 0;
@@ -1121,9 +1139,6 @@ int Board::perft(int depth){
         return nodes;
 
     }
-
-    
-    
 }
 
 /* Evaluates the board state using a number of factors, but mainly material advantage */

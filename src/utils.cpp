@@ -10,123 +10,24 @@ using namespace std;
 
 /* Helper function used to find either the least significant bit (rightmost) or the most significant bit
 (leftmost) of a bitboard. bitscan reverse is used to find the MSB */
-int BitScan(U64 bitboard, bool reverse){
+int BitScan(U64 bitboard){
 
-    // If reverse is not true, do a forward bitscan with ffs() function. Subtract 1 to get 0 based index.
-    if(!reverse){
-        return __builtin_ffsll(bitboard) - 1;
-    }
-    // Uses builtin function that returns trailing zeros from most significant bit. Need to subtract
-    // from 63 to get correct 0 based index.
-    else{
-        return 63 - __builtin_clzll(bitboard);
-    }
+    // return the bitscan to get least significant bit using a built in function
+    return __builtin_ffsll(bitboard) - 1;
 }
 
-/* Serializes the bitboard by finding all indices where the bit is set to 1 */
-vector<int> SerializeBitboard(U64 bb){
 
-    vector<int> bit_indexes;
-    /* Does a bitscan to the first 1, adds it to the bit_indexes list, and resets it until bb is 0ULL */
-    while (bb)
-    {
-        int index = BitScan(bb);
-        bit_indexes.push_back(index);
-        // Resets LSB to 0
-        bb &= (bb - 1);
-    }
-    return bit_indexes;
-}
 
-/* Prints the board out in an 8x8 matrix format */
-void PrintBoard(U64 bitboard){
-   
-
-    // Prints out the binary representation of the board
-    cout << "Binary: " << bitset<64>(bitboard) << endl;
-
-    // Prints out hexadecimal representation of the board
-    printf("Hexadecimal: 0x%lxULL\n", bitboard);
-
-    // Prints out decimal representation of the board
-    printf("Decimal: %d", (int) bitboard);
-
-    // Iterates through each rank of the board
-    for(int rank=7; rank >= 0; rank--){
-
-        printf("\n");
-
-        // Iterates through each column of the board
-        for(int file=0; file < 8; file++){
-
-            // Convert file and rank into square index (0-63)
-            int square = rank * 8 + file;
-            
-
-            // Print rank labels (1-8)
-            if(!file){
-                printf("  %d  " , rank+1);
-            }
-            
-            // Prints the value of the bit at the given position
-            printf(" %d ", (get_bit(bitboard, square) ? 1 : 0));
-        }
-    }
-
-    // Print board file labels (A-H)
-    printf("\n\n      A  B  C  D  E  F  G  H\n\n");
-
-    
-}
-
-/* Prints out the move as source - target - promoted piece */
+/* Prints out the move in UCI format as  bestmove source - target - promoted piece */
 string PrintMove(int move){
 
-    string move_str = square_index[(get_move_source(move))] + "-" + square_index[get_move_target(move)];
-    cout <<  move_str << endl;
+    // extract the start, end, and if applicable, promotion piece of the move
+    int source = get_move_source(move);
+    int target = get_move_target(move);
+    int promoted = get_move_promoted(move);
+
+    // construct the move string as start-end-promoted, or (e7e8q)/ (b1b7)
+    string move_str = square_index[source] + square_index[target] + ((promoted) ? promoted_pieces[promoted] : "");
+    cout <<  "bestmove " << move_str << endl;
     return move_str;
 }
-
-void MoveBit(U64 &bitboard, int start, int end){
-    pop_bit(bitboard, start);
-    set_bit(bitboard, end);
-}
-
-int GetIndexFromSquare(char* square){
-    string s(square);
-    for (int i = 0; i < 64; i++)
-    {
-        if(square_index[i] == s){
-            return i;
-        }
-    }
-    return -1;
-}
-
-/* Generates a random 64 bit number */
-U64 GetRandomU64Numbers()
-{
-    // define 4 random numbers
-    U64 n1, n2;
-
-    // initialize random numbers
-    n1 = (U64) rand();
-    n2 = (U64) rand();
-
-    // Concatenates the random bits
-    return n1 | (n2 << 32);
-}
-
-/* Generate a low non-zero bit candidate for a magic number */
-U64 GenerateMagicCandidate()
-{   
-    // Generates three rand 64 bit numbers
-    U64 n1, n2, n3;
-    n1 = GetRandomU64Numbers();
-    n2 = GetRandomU64Numbers();
-    n3 = GetRandomU64Numbers();
-
-    // Bitwise ands the three numbers to reduce number of 1's
-    return n1 & n2 & n3;
-}
-

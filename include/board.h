@@ -17,6 +17,12 @@ public:
     // Constructor function for board that builds a board based on an FEN string
     Board(std::string fen_string);
 
+    // given a board, changes the board state to match the FEN string
+    void SetFEN(std::string fen_string);
+
+    // given a string of a move (e5e6), makes that move on the board and returns true or returns false if it is an invalid
+    bool MakeMove(std::string move);
+
     // Generates all possible moves and chooses a random one
     int GetRandomMove();
 

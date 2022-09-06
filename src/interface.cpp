@@ -1,5 +1,5 @@
 
-
+/*
 #include <iostream>
 #include <vector>
 #include <iostream>
@@ -10,7 +10,7 @@
 using namespace emscripten;
 using namespace std;
 
-/* Calls the board to get the best move for the given player */
+// Calls the board to get the best move for the given player 
 string GetBestMove(string fen, int depth)
 {
     // Initializes the board with the given fen
@@ -27,3 +27,4 @@ string GetBestMove(string fen, int depth)
 EMSCRIPTEN_BINDINGS(my_module){
     emscripten::function("GetBestMove", &GetBestMove);
 }
+*/
