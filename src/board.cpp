@@ -19,6 +19,24 @@
 using namespace std;
 
 
+// Define the most valuable victim, least valuable attacker table
+int Board::mvv_lva[12][12] = 
+{
+    {105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605},
+    {104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604},
+    {103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603},
+    {102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602},
+    {101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601},
+    {100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600},
+
+    {105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605},
+    {104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604},
+    {103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603},
+    {102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602},
+    {101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601},
+    {100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600}
+};
+
 // Constructor for board, initializes board position and game state (en passant, castling, etc...)
 Board::Board(){
 
@@ -175,7 +193,9 @@ void Board::SetFEN(string fen_string){
 bool Board::MakeMove(string move)
 {
     // init values for the source square, target square, and promotion (if applicable)
-    int source, target, promotion;
+    int source = 0;
+    int target = 0;
+    int promotion = 0;
 
     // iterate through every square
     for (int i = 0; i < 64; i++)
@@ -275,142 +295,8 @@ void Board::GenerateMoves(MoveList *move_list)
     int move;
 
 
-    /**** Knight Moves ****/
-
-    // Get the appropriately colored knight bitboard
-    bitboard = pieces[N + offset];
-
-    while(bitboard)
-    {
-        // get source square and attacks
-        source_square = BitScan(bitboard);
-        attacks = move_calc.knight_attacks[source_square] & ~occupancies[turn_to_move];
-
-        // Iterate over attacks
-        while(attacks)
-        {   
-            // get target square from bitboard
-            target_square = BitScan(attacks);
-
-            // Construct the move and add it to the list
-            move = encode_move(source_square, target_square, (N + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
-            AddMove(move_list, move);
-            
-            // pop after move is generated
-            pop_bit(attacks, target_square);
-        }
-
-        // pop bit after 
-        pop_bit(bitboard, source_square);
-    }
-
-    /**** Rook Moves ****/
-    bitboard = (turn_to_move == white) ? pieces[R] : pieces[r];
-
-    while(bitboard)
-    {
-        // get source square and attacks
-        source_square = BitScan(bitboard);
-        attacks = move_calc.GetRookAttacks(source_square, occupancies[both]) & ~occupancies[turn_to_move];
-
-        // Iterate over attacks
-        while(attacks)
-        {   
-            // get target square from bitboard
-            target_square = BitScan(attacks);
-
-            // Construct the move and add it to the list
-            move = encode_move(source_square, target_square, (R + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
-            AddMove(move_list, move);
-            
-            // pop after move is generated
-            pop_bit(attacks, target_square);
-        }
-
-        // pop bit after 
-        pop_bit(bitboard, source_square);
-    }
-
-    /**** Bishop Moves ****/
-    bitboard = (turn_to_move == white) ? pieces[B] : pieces[b];
-
-    while(bitboard)
-    {
-        // get source square and attacks
-        source_square = BitScan(bitboard);
-        attacks = move_calc.GetBishopAttacks(source_square, occupancies[both]) & ~occupancies[turn_to_move];
-
-        // Iterate over attacks
-        while(attacks)
-        {   
-            // get target square from bitboard
-            target_square = BitScan(attacks);
-
-            // Construct the move and add it to the list
-            move = encode_move(source_square, target_square, (B + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
-            AddMove(move_list, move);
-            
-            // pop after move is generated
-            pop_bit(attacks, target_square);
-        }
-
-        // pop bit after 
-        pop_bit(bitboard, source_square);
-    }
-
-    /**** Queen Moves ****/
-    bitboard = (turn_to_move == white) ? pieces[Q] : pieces[q];
-
-    while(bitboard)
-    {
-        // get source square and attacks
-        source_square = BitScan(bitboard);
-        attacks = move_calc.GetQueenAttacks(source_square, occupancies[both]) & ~occupancies[turn_to_move];
-
-        // Iterate over attacks
-        while(attacks)
-        {   
-            // get target square from bitboard
-            target_square = BitScan(attacks);
-
-            // Construct the move and add it to the list
-            move = encode_move(source_square, target_square, (Q + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
-            AddMove(move_list, move);
-            
-            // pop after move is generated
-            pop_bit(attacks, target_square);
-        }
-
-        // pop bit after 
-        pop_bit(bitboard, source_square);
-    }
-
-    /**** King Moves ****/
-    bitboard = (turn_to_move == white) ? pieces[K] : pieces[k];
-
-    while(bitboard)
-    {
-        // get source square and attacks
-        source_square = BitScan(bitboard);
-        attacks = move_calc.king_attacks[source_square] & ~occupancies[turn_to_move];
-
-        // Iterate over attacks
-        while(attacks)
-        {   
-            // get target square from bitboard
-            target_square = BitScan(attacks);
-
-            // Construct the move and add it to the list
-            move = encode_move(source_square, target_square, (K + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
-            AddMove(move_list, move);
-            
-            // pop after move is generated
-            pop_bit(attacks, target_square);
-        }
-
-        // pop bit after 
-        pop_bit(bitboard, source_square);
-    }
+    
+    
 
     /*** Quiet Pawn Moves ***/
     
@@ -668,8 +554,145 @@ void Board::GenerateMoves(MoveList *move_list)
 
         pop_bit(bitboard, source_square);
 
-
     }
+
+    /**** Knight Moves ****/
+
+    // Get the appropriately colored knight bitboard
+    bitboard = pieces[N + offset];
+
+    while(bitboard)
+    {
+        // get source square and attacks
+        source_square = BitScan(bitboard);
+        attacks = move_calc.knight_attacks[source_square] & ~occupancies[turn_to_move];
+
+        // Iterate over attacks
+        while(attacks)
+        {   
+            // get target square from bitboard
+            target_square = BitScan(attacks);
+
+            // Construct the move and add it to the list
+            move = encode_move(source_square, target_square, (N + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            AddMove(move_list, move);
+            
+            // pop after move is generated
+            pop_bit(attacks, target_square);
+        }
+
+        // pop bit after 
+        pop_bit(bitboard, source_square);
+    }
+
+    /**** Bishop Moves ****/
+    bitboard = (turn_to_move == white) ? pieces[B] : pieces[b];
+
+    while(bitboard)
+    {
+        // get source square and attacks
+        source_square = BitScan(bitboard);
+        attacks = move_calc.GetBishopAttacks(source_square, occupancies[both]) & ~occupancies[turn_to_move];
+
+        // Iterate over attacks
+        while(attacks)
+        {   
+            // get target square from bitboard
+            target_square = BitScan(attacks);
+
+            // Construct the move and add it to the list
+            move = encode_move(source_square, target_square, (B + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            AddMove(move_list, move);
+            
+            // pop after move is generated
+            pop_bit(attacks, target_square);
+        }
+
+        // pop bit after 
+        pop_bit(bitboard, source_square);
+    }
+
+    /**** Rook Moves ****/
+    bitboard = (turn_to_move == white) ? pieces[R] : pieces[r];
+
+    while(bitboard)
+    {
+        // get source square and attacks
+        source_square = BitScan(bitboard);
+        attacks = move_calc.GetRookAttacks(source_square, occupancies[both]) & ~occupancies[turn_to_move];
+
+        // Iterate over attacks
+        while(attacks)
+        {   
+            // get target square from bitboard
+            target_square = BitScan(attacks);
+
+            // Construct the move and add it to the list
+            move = encode_move(source_square, target_square, (R + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            AddMove(move_list, move);
+            
+            // pop after move is generated
+            pop_bit(attacks, target_square);
+        }
+
+        // pop bit after 
+        pop_bit(bitboard, source_square);
+    }
+
+    /**** Queen Moves ****/
+    bitboard = (turn_to_move == white) ? pieces[Q] : pieces[q];
+
+    while(bitboard)
+    {
+        // get source square and attacks
+        source_square = BitScan(bitboard);
+        attacks = move_calc.GetQueenAttacks(source_square, occupancies[both]) & ~occupancies[turn_to_move];
+
+        // Iterate over attacks
+        while(attacks)
+        {   
+            // get target square from bitboard
+            target_square = BitScan(attacks);
+
+            // Construct the move and add it to the list
+            move = encode_move(source_square, target_square, (Q + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            AddMove(move_list, move);
+            
+            // pop after move is generated
+            pop_bit(attacks, target_square);
+        }
+
+        // pop bit after 
+        pop_bit(bitboard, source_square);
+    }
+
+    /**** King Moves ****/
+    bitboard = (turn_to_move == white) ? pieces[K] : pieces[k];
+
+    while(bitboard)
+    {
+        // get source square and attacks
+        source_square = BitScan(bitboard);
+        attacks = move_calc.king_attacks[source_square] & ~occupancies[turn_to_move];
+
+        // Iterate over attacks
+        while(attacks)
+        {   
+            // get target square from bitboard
+            target_square = BitScan(attacks);
+
+            // Construct the move and add it to the list
+            move = encode_move(source_square, target_square, (K + offset), 0, (get_bit(occupancies[enemy], target_square) ? 1 : 0), 0, 0, 0);
+            AddMove(move_list, move);
+            
+            // pop after move is generated
+            pop_bit(attacks, target_square);
+        }
+
+        // pop bit after 
+        pop_bit(bitboard, source_square);
+    }
+
 }
 
 
@@ -922,56 +945,31 @@ int Board::GetRandomMove()
 int Board::GetBestMove(int depth)
 {
 
-    // init best move and move list
-    int best_move;
-    MoveList move_list;
+    // reset the num of nodes searched, ply, and best move variables
+    nodes = 0;
+    ply = 0;
+    best_move = 0;
 
-    // init a score variable
-    int score;
+    // clear data structures for search
+    memset(killer_moves, 0, sizeof(killer_moves));
+    memset(pv_table, 0, sizeof(pv_table));
+    memset(pv_length, 0, sizeof(pv_length));
 
-    // initialize a best score (very low to start with)
-    int best_score = -100000;
+    // run the negamax function to get an evaluation and set the best move variable
+    int score = NegaMax(-50000, 50000, depth);
 
-    // populates the move list with pseudo-legal moves
-    GenerateMoves(&move_list);
+    // if the turn to move is black, negate the score 
+    score = (turn_to_move == white) ? score : score * -1;
 
-    // iterate over every move
-    for (int count=0; count < move_list.count; count++)
-    {
-        // copy the board state
-        copy_board();
-
-        // if this move is not valid
-        if (!MakeMove(move_list.moves[count], all_moves))
-        {
-            // continue to next move
-            continue;
-        }
-        
-        // Call the recursive negamax function to get the score of this move
-        score = -NegaMax(-50000, 50000, depth - 1);
-
-        // if the score is the best so far
-        if (score > best_score)
-        {   
-            // update current best move and best score
-            best_move = move_list.moves[count];
-            best_score = score;
-        }
-
-        // preserve board state
-        take_back();
-
-
-    }
-
-    // Return the best move found
-    return best_move;
-
+    // return the board evaluation score
+    return score;
 }
 
 int Board::Quiescence(int alpha, int beta)
-{
+{   
+
+    // increment nodes searched
+    nodes++;
 
     // evaluate position
     int evaluation = Evaluate();
@@ -993,19 +991,35 @@ int Board::Quiescence(int alpha, int beta)
     // populate move list with moves
     GenerateMoves(&move_list);
 
+    // sort the moves to search best moves first
+    SortMoves(&move_list);
+
     // iterate over every move
     for (int count = 0; count < move_list.count; count++)
     {
         // copy board state
         copy_board();
 
+        // update the ply
+        ply++;
+
         // if this move is not valid
         if (!MakeMove(move_list.moves[count], only_captures))
+        {
+            // decrement ply
+            ply--;
+
             // continue to next move
             continue;
+        }
+            
 
         // recursively get score from negamax function
         int score = -Quiescence(-beta, -alpha);
+
+        // take the move back and decrement the ply
+        take_back();
+        ply--;
 
         // fail-hard beta cautoff
         if (score >= beta)
@@ -1017,8 +1031,6 @@ int Board::Quiescence(int alpha, int beta)
             alpha = score;
         }
 
-        // restore board state
-        take_back();
     }
 
     // node fails low
@@ -1030,20 +1042,27 @@ int Board::Quiescence(int alpha, int beta)
 int Board::NegaMax(int alpha, int beta, int depth)
 {
 
+    // init PV length
+    pv_length[ply] = ply;
+
+
     // if at the base depth (base case)
-    if (depth == 0){
+    if (depth == 0)
         // return quiescence search
-        return Evaluate();
-    }
+        return Quiescence(alpha, beta);
+    
+
+    // increment num. of nodes searched
+    nodes++;
 
     // determine if the king is in check or note
     bool in_check = IsSquareAttacked((turn_to_move == white) ? BitScan(pieces[K]) : BitScan(pieces[k]), turn_to_move ^ 1);
 
+    // increase search depth if the king has been exposed into a check
+    if (in_check) depth++;
+
     // count number of legal moves
     int legal_moves = 0;
-
-    // init best score and score variables
-    int score;
 
     // init move list
     MoveList move_list;
@@ -1051,31 +1070,80 @@ int Board::NegaMax(int alpha, int beta, int depth)
     // populate move list with moves
     GenerateMoves(&move_list);
 
+    // sort the moves to search in descending order
+    SortMoves(&move_list);
+
     // iterate over every move
     for (int count = 0; count < move_list.count; count++)
     {
         // copy board state
         copy_board();
 
+        // increment ply, meaning we are making a move
+        ply++;
+
         // if this move is not valid
         if (!MakeMove(move_list.moves[count], all_moves))
+        {
+
+            // decrement ply
+            ply--;
+
             // continue to next move
             continue;
+
+        }
+            
 
         // increment number of legal moves
         legal_moves++;
         
         // recursively get score from negamax function
-        score = -NegaMax(-beta, -alpha, depth - 1);
-
-        // fail-hard beta cautoff
-        if (score >= beta)
-            return beta;
-
-        alpha = max(score, alpha);
+        int score = -NegaMax(-beta, -alpha, depth - 1);
 
         // restore board state
         take_back();
+
+        // decrement ply after taking move back
+        ply--;
+
+        // fail-hard beta cautoff
+        if (score >= beta)
+        {
+            // on quiet moves
+            if (!get_move_capture(move_list.moves[count]))
+            {
+                // store killer moves
+                killer_moves[1][ply] = killer_moves[0][ply];
+                killer_moves[0][ply] = move_list.moves[count];
+
+            }
+            
+            
+            // return beta value
+            return beta;
+        }
+
+        // we have found a better move than previous best move
+        if (score > alpha)
+        {
+            // update the alpha value
+            alpha = score; 
+
+            // write PV move
+            pv_table[ply][ply] = move_list.moves[count];
+
+            // loop over next ply
+            for (int next_ply = ply + 1; next_ply < pv_length[ply + 1]; next_ply++)
+                // copy move from deeper ply into current ply's line
+                pv_table[ply][next_ply] = pv_table[ply + 1][next_ply];
+            
+            // adjust PV length
+            pv_length[ply] = pv_length[ply + 1];
+        }
+
+
+       
     }
 
     // no legal moves to make in this position
@@ -1083,14 +1151,12 @@ int Board::NegaMax(int alpha, int beta, int depth)
     {
         // king is in check
         if (in_check)
-            // return mating score (10-depth is so that it finds sooner checkmates)
-            return -49000 - (10 - depth);
+            // return mating score ( + ply is so that it finds sooner checkmates)
+            return -49000 + ply;
         else
             // return stalemate score
             return 0;
-    }
-
-    
+    } 
     return alpha;
 
 }
@@ -1139,6 +1205,9 @@ int Board::perft(int depth){
         return nodes;
 
     }
+
+    
+    
 }
 
 /* Evaluates the board state using a number of factors, but mainly material advantage */
@@ -1193,6 +1262,105 @@ int Board::Evaluate()
 
     // If white, return the score, otherwise return -score so that it is always relatively positive to current side's move
     return (turn_to_move == white) ? score : -score;
+}
+
+/* Returns a numerical score that ranks the strength of the given move. Used for earlier beta-cutoffs */
+int Board::ScoreMove(int move)
+{
+
+    // score a capture move
+    if (get_move_capture(move))
+    {   
+        // init a target piece that is being captured
+        int target_piece = P;
+
+        // to loop over bitboards and find what piece is being captured
+        int start_piece, end_piece;
+
+        // If white, then loop through white pawns to white king, otherwise black pawns to black king
+        start_piece = (turn_to_move == white) ? p : P;
+        end_piece = (turn_to_move == white) ? k : K;
+
+        int target_square = get_move_target(move);
+
+        // loop through all the piece bitboard
+        for (int piece = start_piece; piece <= end_piece; piece++)
+        {   
+            // if there is a piece on that square
+            if (get_bit(pieces[piece], target_square))
+            {
+                // set our target piece to that piece and break
+                target_piece = piece;
+                break;
+            }
+        }
+        // score move by MVV LVA lookup [source piece][target piece]
+        return mvv_lva[get_move_piece(move)][target_piece];
+
+
+    }
+
+    // score quiet move
+    else
+    {
+        // score 1st killer move
+        if (killer_moves[0][ply] == move)
+            return 9000;
+
+        // score 2nd killer move
+        else if (killer_moves[1][ply] == move)
+            return 8000;
+    }
+
+    return 0;
+}
+
+/* Sorts the moves in descending moves so best move is searched first */
+void Board::SortMoves(MoveList *move_list)
+{
+    // initialize all of the move scores
+    int move_scores[move_list->count];
+
+    // iterate over all of the moves
+    for (int count = 0; count < move_list->count; count++)
+        // populate the move_scores array with the scores of the moves
+        move_scores[count] = ScoreMove(move_list->moves[count]);
+    
+
+    // keeps track of whether bubble sort performs a swap or not (if it doesn't then array is sorted)
+    bool has_swapped = true;
+
+    // iterate until has_swapped is not true
+    while(has_swapped)
+    {
+        // start each iteration with no swaps
+        has_swapped = false;
+
+        // iterate through all of the moves (up to but not including the last move)
+        for (int i = 0; i < (move_list->count - 1); i++)
+        {
+            // if the next move is better than the current move
+            if (move_scores[i+1] > move_scores[i])
+            {
+                // keep track of temp variable to swap
+                int temp_move = move_list->moves[i];
+
+                // swap the moves
+                move_list->moves[i] = move_list->moves[i+1];
+                move_list->moves[i + 1] = temp_move;
+
+                //swap the scores
+                int temp_score = move_scores[i];
+                move_scores[i] = move_scores[i + 1];
+                move_scores[i + 1] = temp_score;
+
+                // indicate that a swap has occurred
+                has_swapped = true;
+            }
+        }
+    }
+
+
 }
 
 /* Calls the board's constructor to reset it to the original start position */

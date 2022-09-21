@@ -50,6 +50,19 @@ public:
     // Evaluates the current state of the board and returns a number indicating which side has an advantage
     int Evaluate();
 
+    int turn_to_move;       // Holds the color of whose turn it is
+
+    int best_move;          // Stores the best move within a search
+
+    int nodes;
+    int ply;
+
+    // PV length
+    int pv_length[64];
+
+    // PV table
+    int pv_table[64][64];
+
     
     
 
@@ -68,6 +81,9 @@ private:
         memcpy(occupancies, occupancies_copy, sizeof(occupancies));                         \
         turn_to_move=turn_copy, enpassant=enpassant_copy, castling_rights=castle_copy;  
 
+    
+
+
     // piece bitboards
     U64 pieces[12];
 
@@ -75,7 +91,7 @@ private:
     U64 occupancies[3];
 
     // Board state variables
-    int turn_to_move;       // Holds the color of whose turn it is
+    
     int enpassant;          // Holds the square that a piece can make an en passant move to, if 0 then no en passant
 
     // This stores castling rights
@@ -106,8 +122,6 @@ private:
     // Function that adds a move to a move list struct and updates how many moves exist within it 
     void AddMove(MoveList *move_list, int move);
 
-     
-
     // Returns true if the given square is being attacked by the given color side
     bool IsSquareAttacked(int square, int color);
 
@@ -119,6 +133,12 @@ private:
 
     // Quiescence search, searches capture moves until reaching a calm position
     int Quiescence(int alpha, int beta);
+
+    // Scores a move to order them for alpha-beta pruning
+    int ScoreMove(int move);
+
+    // sorts a move list so that best move is first
+    void SortMoves(MoveList *move_list);
 
     /***
      * Tables used for positional piece evaluation 
@@ -201,5 +221,16 @@ private:
         a2, b2, c2, d2, e2, f2, g2, h2,
         a1, b1, c1, d1, e1, f1, g1, h1,   
     };
+
+    // MVV LVA [attacker][victim]
+    static int mvv_lva[12][12];
+
+    // killer moves [id][ply]
+    int killer_moves[2][64];
+
+    // history moves [piece][square]
+    int history_moves[12][64];
+    
+    
 
 };

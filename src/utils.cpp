@@ -28,6 +28,6 @@ string PrintMove(int move){
 
     // construct the move string as start-end-promoted, or (e7e8q)/ (b1b7)
     string move_str = square_index[source] + square_index[target] + ((promoted) ? promoted_pieces[promoted] : "");
-    cout <<  "bestmove " << move_str << endl;
+    cout <<  move_str;
     return move_str;
 }

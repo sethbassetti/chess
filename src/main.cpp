@@ -2,6 +2,7 @@
 #include <string>
 #include <stdlib.h>
 #include <bits/stdc++.h>
+#include <chrono>
 
 
 #include "move_calc.h"
@@ -10,6 +11,7 @@
 
 using namespace std;
 
+int max_ply = 64;
 
 // initialize the board object
 Board board = Board();
@@ -110,6 +112,53 @@ void parse_go(string input_line)
         depth = stoi(token);
 
     }
+
+    // if we are given a movetime argument
+    else if (token == "movetime")
+    {
+
+        // read in the amount of milliseconds
+        ss >> token;
+
+        // get the move depth from the command
+        int move_time = stoi(token);
+
+        // Start measuring time
+        auto start = chrono::steady_clock::now();
+
+        // start at ply of 1
+        int current_depth = 1;
+
+        // while the current time minus start time (* 1000 for milliseconds) is less than the move time, search for moves
+        while ((chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() < move_time) && current_depth < max_ply)
+        {
+            // use negamax to calculate best move to a certain depth
+            int score = board.GetBestMove(current_depth);
+
+            // print search information out for gui usage
+            cout << "info score cp " << score << " depth " <<  current_depth << " nodes " << board.nodes << " pv ";
+
+            // Iterate over all PV moves
+            for (int count = 0; count < board.pv_length[0]; count++)
+            {   
+                // print each of the PV moves
+                PrintMove(board.pv_table[0][count]);
+                cout << " ";
+            }
+            cout << endl;
+
+            // increment the current depth 1
+            current_depth ++;
+
+        }
+
+        // print out that move to standard output
+        cout << "bestmove ";
+        PrintMove(board.pv_table[0][0]);
+        cout << endl;
+        return;
+
+    }
     else
     {
         // otherwise default to a depth of 6
@@ -117,10 +166,24 @@ void parse_go(string input_line)
     }
 
     // use negamax to calculate best move to a certain depth
-    int move = board.GetBestMove(depth);
+    int score = board.GetBestMove(depth);
+
+    // print search information out for gui usage
+    cout << "info score cp " << score << " depth " <<  depth << " nodes " << board.nodes << " pv ";
+
+    // Iterate over all PV moves
+    for (int count = 0; count < board.pv_length[0]; count++)
+    {   
+        // print each of the PV moves
+        PrintMove(board.pv_table[0][count]);
+        cout << " ";
+    }
+    cout << endl;
 
     // print out that move to standard output
-    PrintMove(move);
+    cout << "bestmove ";
+    PrintMove(board.pv_table[0][0]);
+    cout << endl;
 
 }
 
@@ -172,6 +235,11 @@ void uci_loop()
         else if(input_line == "d")
         {
             board.Display();
+        }
+
+        else if(input_line == "e")
+        {
+            cout << "score for " << ((board.turn_to_move) ? "black" : "white") << ": " << board.Evaluate() << endl;
         }
 
         // if quit command is given, exit the while loop
