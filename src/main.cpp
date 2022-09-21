@@ -161,8 +161,8 @@ void parse_go(string input_line)
     }
     else
     {
-        // otherwise default to a depth of 6
-        depth = 6;
+        // otherwise default to a depth of 7
+        depth = 7;
     }
 
     // use negamax to calculate best move to a certain depth

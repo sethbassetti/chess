@@ -214,8 +214,17 @@ bool Board::MakeMove(string move)
         for (int piece = P; piece <= k; piece++)
         {
             // if the promoted piece == the character in the move, set the promotion piece
-            if (promoted_pieces[piece] == move.substr(4, 1)) promotion = piece;
+            if (promoted_pieces[piece] == move.substr(4, 1))
+            {
+                // if there is a promotion, it will always match the white piece first so break to keep it on white piece
+                promotion = piece;
+                break;
+            }
+
         }
+
+        // if the move is white, keep the promoted piece as a white piece, otherwise, add 6 to get to the black piece
+        promotion = (turn_to_move == white) ? promotion : promotion + 6;
     }
     // otherwise set promotion to 0
     else promotion = 0;
